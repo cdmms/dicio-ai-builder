@@ -1,6 +1,7 @@
 package org.stypox.dicio.ui.nav
 
 import android.content.Intent
+import com.memeable.dicioai.ai.AiAgentActivity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.DrawerValue
@@ -47,6 +48,7 @@ fun Navigation() {
                     val intent = Intent(context, SttPopupActivity::class.java)
                     context.startActivity(intent)
                 },
+        onAiAgentClick = { context.startActivity(Intent(context, AiAgentActivity::class.java)) },
             ) {
                 HomeScreen(it)
             }
@@ -74,6 +76,7 @@ fun ScreenWithDrawer(
     onSettingsClick: () -> Unit,
     onAboutClick: () -> Unit,
     onSpeechToTextPopupClick: () -> Unit,
+    onAiAgentClick: () -> Unit,
     screen: @Composable (navigationIcon: @Composable () -> Unit) -> Unit
 ) {
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
@@ -86,6 +89,7 @@ fun ScreenWithDrawer(
                 onSettingsClick = onSettingsClick,
                 onAboutClick = onAboutClick,
                 onSpeechToTextPopupClick = onSpeechToTextPopupClick,
+                onAiAgentClick = onAiAgentClick,
                 closeDrawer = {
                     scope.launch {
                         drawerState.close()

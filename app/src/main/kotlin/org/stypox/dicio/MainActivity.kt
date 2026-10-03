@@ -75,6 +75,9 @@ class MainActivity : BaseActivity() {
             // turn on the screen to let the user see what is happening
             setShowWhenLocked(true)
             setTurnScreenOn(true)
+            startActivity(Intent(this, com.memeable.dicioai.ai.AiAgentActivity::class.java).apply {
+                putExtra(com.memeable.dicioai.ai.AiAgentActivity.EXTRA_AUTO_LISTEN, true)
+            })
         }
 
         // the wake word triggered notification is not needed anymore

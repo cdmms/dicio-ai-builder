@@ -65,10 +65,28 @@
                 android:name="android.app.shortcuts"
                 android:resource="@xml/shortcuts" />
         </activity>
-
         <activity
-            android:name=".error.ErrorActivity"
+            android:name="com.memeable.dicioai.ai.AiAgentActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        <receiver
+            android:name="com.memeable.dicioai.ai.AiTimerReceiver"
             android:exported="false" />
+        <service
+            android:name="com.memeable.dicioai.ai.AgentAccessibilityService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/dicio_ai_accessibility_service" />
+        </service>
+
+
+
+        <activity android:name=".error.ErrorActivity" />
 
         <activity
             android:name=".io.input.stt_popup.SttPopupActivity"

@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Settings
@@ -37,6 +38,7 @@ fun DrawerContent(
     onSettingsClick: () -> Unit,
     onAboutClick: () -> Unit,
     onSpeechToTextPopupClick: () -> Unit,
+    onAiAgentClick: () -> Unit,
     closeDrawer: () -> Unit,
 ) {
     ModalDrawerSheet(
@@ -46,6 +48,24 @@ fun DrawerContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(12.dp)
+        )
+
+        NavigationDrawerItem(
+            icon = {
+                Icon(
+                    imageVector = Icons.Default.AutoAwesome,
+                    contentDescription = "AI Agent",
+                )
+            },
+            label = { Text("AI Agent") },
+            selected = false,
+            onClick = {
+                onAiAgentClick()
+                closeDrawer()
+            },
+            modifier = Modifier
+                .padding(horizontal = 12.dp)
+                .testTag("ai_agent_drawer_item"),
         )
 
         DrawerItem(

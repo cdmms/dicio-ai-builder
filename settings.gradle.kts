@@ -3,7 +3,7 @@ import org.eclipse.jgit.api.Git
 import java.io.FileInputStream
 import java.util.Properties
 
-rootProject.name = "Dicio"
+rootProject.name = "Dicio AI"
 include(":app")
 include(":skill")
 // we use includeBuild here since the plugins are compile-time dependencies
@@ -23,7 +23,7 @@ plugins {
     // this code is duplicate with the below but there is no way to avoid it...
     fun findInVersionCatalog(versionIdentifier: String): String {
         val regex = "^.*$versionIdentifier *= *\"([^\"]+)\".*$".toRegex()
-        return File("gradle/libs.versions.toml")
+        return File(settingsDir, "gradle/libs.versions.toml")
             .readLines()
             .firstNotNullOf { regex.find(it)?.groupValues?.get(1) }
     }
@@ -56,7 +56,7 @@ data class IncludeGitRepo(
 // this code is duplicate with the above but there is no way to avoid it...
 fun findInVersionCatalog(versionIdentifier: String): String {
     val regex = "^.*$versionIdentifier *= *\"([^\"]+)\".*$".toRegex()
-    return File("gradle/libs.versions.toml")
+    return File(settingsDir, "gradle/libs.versions.toml")
         .readLines()
         .firstNotNullOf { regex.find(it)?.groupValues?.get(1) }
 }
