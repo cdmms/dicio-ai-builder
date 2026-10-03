@@ -1,5 +1,7 @@
 package org.stypox.dicio.skills.telephone
 
+import com.memeable.dicioai.R
+
 import android.Manifest
 import android.content.Context
 import androidx.compose.material.icons.Icons
@@ -12,7 +14,6 @@ import org.dicio.skill.skill.Skill
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.Permission
 import org.dicio.skill.skill.SkillInfo
-import org.stypox.dicio.R
 import org.stypox.dicio.sentences.Sentences
 import org.stypox.dicio.util.PERMISSION_CALL_PHONE
 import org.stypox.dicio.util.PERMISSION_READ_CONTACTS

@@ -1,5 +1,7 @@
 package com.memeable.dicioai.ai
 
+import com.memeable.dicioai.R
+
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent

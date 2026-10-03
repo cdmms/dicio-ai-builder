@@ -1,5 +1,7 @@
 package org.stypox.dicio.skills.timer
 
+import com.memeable.dicioai.R
+
 import android.media.Ringtone
 import android.media.RingtoneManager
 import android.os.Build
@@ -12,7 +14,6 @@ import org.dicio.skill.skill.SkillInfo
 import org.dicio.skill.skill.SkillOutput
 import org.dicio.skill.standard.StandardRecognizerData
 import org.dicio.skill.standard.StandardRecognizerSkill
-import org.stypox.dicio.R
 import org.stypox.dicio.sentences.Sentences.Timer
 import org.stypox.dicio.util.StringUtils
 import org.stypox.dicio.util.getString

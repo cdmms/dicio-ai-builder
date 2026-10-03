@@ -1,5 +1,7 @@
 package org.stypox.dicio.ui.home
 
+import com.memeable.dicioai.R
+
 import android.Manifest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -35,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.shreyaspatil.permissionflow.compose.rememberPermissionFlowRequestLauncher
 import dev.shreyaspatil.permissionflow.compose.rememberPermissionState
-import org.stypox.dicio.R
 import org.stypox.dicio.io.input.SttState
 import org.stypox.dicio.io.input.SttState.Downloaded
 import org.stypox.dicio.io.input.SttState.Downloading

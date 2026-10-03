@@ -1,5 +1,7 @@
 package org.stypox.dicio.ui.home
 
+import com.memeable.dicioai.R
+
 import android.Manifest
 import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
@@ -24,7 +26,6 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import dev.shreyaspatil.permissionflow.compose.rememberMultiplePermissionState
 import dev.shreyaspatil.permissionflow.compose.rememberPermissionFlowRequestLauncher
-import org.stypox.dicio.R
 import org.stypox.dicio.error.ErrorInfo
 import org.stypox.dicio.error.ErrorUtils
 import org.stypox.dicio.error.ExceptionUtils

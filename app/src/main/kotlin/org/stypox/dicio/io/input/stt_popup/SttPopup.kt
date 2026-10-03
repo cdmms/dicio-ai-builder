@@ -1,5 +1,7 @@
 package org.stypox.dicio.io.input.stt_popup
 
+import com.memeable.dicioai.R
+
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -56,7 +58,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import org.stypox.dicio.R
 import org.stypox.dicio.io.input.SttState
 import org.stypox.dicio.ui.home.SttFab
 import org.stypox.dicio.ui.theme.AppTheme

@@ -1,5 +1,7 @@
 package org.stypox.dicio.ui.nav
 
+import com.memeable.dicioai.R
+
 import android.content.Intent
 import com.memeable.dicioai.ai.AiAgentActivity
 import androidx.compose.material.icons.Icons
@@ -17,7 +19,6 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import kotlinx.coroutines.launch
-import org.stypox.dicio.R
 import org.stypox.dicio.io.input.stt_popup.SttPopupActivity
 import org.stypox.dicio.settings.MainSettingsScreen
 import org.stypox.dicio.settings.SkillSettingsScreen

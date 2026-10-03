@@ -1,5 +1,7 @@
 package org.stypox.dicio.settings.ui
 
+import com.memeable.dicioai.R
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,7 +47,6 @@ import androidx.compose.ui.tooling.preview.datasource.LoremIpsum
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import kotlinx.coroutines.job
-import org.stypox.dicio.R
 import kotlin.math.roundToInt
 
 interface SettingWithValue<T> {

@@ -1,5 +1,7 @@
 package org.stypox.dicio.io.graphical
 
+import com.memeable.dicioai.R
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.ElevatedButton
@@ -14,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import okio.IOException
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.SkillOutput
-import org.stypox.dicio.R
 import org.stypox.dicio.di.SkillContextImpl
 import org.stypox.dicio.error.ErrorInfo
 import org.stypox.dicio.error.ErrorUtils

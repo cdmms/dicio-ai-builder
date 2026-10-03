@@ -2,6 +2,8 @@
 
 package org.stypox.dicio.ui.about
 
+import com.memeable.dicioai.R
+
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -40,7 +42,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.stypox.dicio.BuildConfig
-import org.stypox.dicio.R
 import org.stypox.dicio.error.ErrorActivity
 import org.stypox.dicio.settings.ui.SettingsItem
 import org.stypox.dicio.ui.theme.AppTheme

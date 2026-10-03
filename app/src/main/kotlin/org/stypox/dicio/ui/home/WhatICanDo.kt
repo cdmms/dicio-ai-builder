@@ -1,5 +1,7 @@
 package org.stypox.dicio.ui.home
 
+import com.memeable.dicioai.R
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -28,7 +30,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import org.dicio.skill.skill.SkillInfo
-import org.stypox.dicio.R
 import org.stypox.dicio.eval.SkillHandler
 import org.stypox.dicio.ui.theme.AppTheme
 import org.stypox.dicio.ui.util.SkillInfoPreviews

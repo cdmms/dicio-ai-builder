@@ -1,5 +1,7 @@
 package org.stypox.dicio.skills.translation
 
+import com.memeable.dicioai.R
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -38,7 +40,6 @@ import androidx.compose.ui.tooling.preview.datasource.LoremIpsum
 import androidx.compose.ui.unit.dp
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.SkillOutput
-import org.stypox.dicio.R
 import org.stypox.dicio.cldr.CldrLanguages.LocaleAndTranslation
 import org.stypox.dicio.di.SkillContextImpl
 import org.stypox.dicio.io.graphical.Headline

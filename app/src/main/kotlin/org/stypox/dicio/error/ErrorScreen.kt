@@ -1,5 +1,7 @@
 package org.stypox.dicio.error
 
+import com.memeable.dicioai.R
+
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,7 +30,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import org.stypox.dicio.BuildConfig
-import org.stypox.dicio.R
 import org.stypox.dicio.ui.theme.AppTheme
 import java.util.Locale
 

@@ -1,10 +1,11 @@
 package org.stypox.dicio.skills.telephone
 
+import com.memeable.dicioai.R
+
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.SkillOutput
-import org.stypox.dicio.R
 import org.stypox.dicio.io.graphical.Headline
 import org.stypox.dicio.util.getString
 

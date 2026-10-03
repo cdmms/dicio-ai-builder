@@ -1,5 +1,9 @@
 package org.stypox.dicio.util
 
+import com.memeable.dicioai.R
+
+import com.memeable.dicioai.main.R
+
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -13,7 +17,6 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import org.stypox.dicio.MainActivity
-import org.stypox.dicio.R
 import org.stypox.dicio.io.input.stt_popup.SttPopupActivity
 import org.stypox.dicio.util.ShareUtils.openAppChooser
 import org.stypox.dicio.util.ShareUtils.openUrlInApp

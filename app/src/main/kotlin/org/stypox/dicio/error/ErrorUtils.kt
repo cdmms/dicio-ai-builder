@@ -1,5 +1,7 @@
 package org.stypox.dicio.error
 
+import com.memeable.dicioai.R
+
 import android.Manifest
 import android.app.Activity
 import android.app.PendingIntent
@@ -13,7 +15,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.fragment.app.Fragment
-import org.stypox.dicio.R
 import java.util.Locale
 
 /**

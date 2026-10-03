@@ -1,5 +1,7 @@
 package org.stypox.dicio.skills.open
 
+import com.memeable.dicioai.R
+
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.compose.foundation.Image
@@ -26,7 +28,6 @@ import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.SkillOutput
 import org.stypox.dicio.BuildConfig
-import org.stypox.dicio.R
 import org.stypox.dicio.di.SkillContextImpl
 import org.stypox.dicio.io.graphical.Headline
 import org.stypox.dicio.ui.home.SkillAnswerCard

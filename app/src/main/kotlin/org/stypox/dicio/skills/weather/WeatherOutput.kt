@@ -1,5 +1,7 @@
 package org.stypox.dicio.skills.weather
 
+import com.memeable.dicioai.R
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -18,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.SkillOutput
-import org.stypox.dicio.R
 import org.stypox.dicio.io.graphical.HeadlineSpeechSkillOutput
 import org.stypox.dicio.util.getString
 import org.stypox.dicio.util.lowercaseCapitalized

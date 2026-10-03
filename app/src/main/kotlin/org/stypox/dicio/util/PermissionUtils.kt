@@ -1,5 +1,7 @@
 package org.stypox.dicio.util
 
+import com.memeable.dicioai.R
+
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -16,8 +18,6 @@ import androidx.core.app.ActivityCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import dev.shreyaspatil.permissionflow.compose.rememberMultiplePermissionState
 import org.dicio.skill.skill.Permission
-import org.stypox.dicio.R
-
 val PERMISSION_READ_CONTACTS = Permission.NormalPermission(
     name = R.string.perm_read_contacts,
     id = Manifest.permission.READ_CONTACTS,

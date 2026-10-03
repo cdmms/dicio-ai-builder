@@ -1,5 +1,7 @@
 package org.stypox.dicio
 
+import com.memeable.dicioai.R
+
 import android.Manifest
 import android.app.Application
 import android.os.Build

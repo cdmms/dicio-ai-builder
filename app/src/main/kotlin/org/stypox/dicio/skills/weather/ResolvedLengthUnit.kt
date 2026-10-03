@@ -1,10 +1,11 @@
 package org.stypox.dicio.skills.weather
 
+import com.memeable.dicioai.R
+
 import android.icu.util.LocaleData
 import android.icu.util.ULocale
 import android.os.Build
 import androidx.annotation.StringRes
-import org.stypox.dicio.R
 import java.util.Locale
 
 enum class ResolvedLengthUnit(

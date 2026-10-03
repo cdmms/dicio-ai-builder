@@ -1,5 +1,7 @@
 package org.stypox.dicio.io.speech
 
+import com.memeable.dicioai.R
+
 import android.content.Context
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
@@ -7,7 +9,6 @@ import android.util.Log
 import android.widget.Toast
 import androidx.annotation.StringRes
 import org.dicio.skill.context.SpeechOutputDevice
-import org.stypox.dicio.R
 import java.util.Locale
 
 class AndroidTtsSpeechDevice(private var context: Context, locale: Locale) : SpeechOutputDevice {

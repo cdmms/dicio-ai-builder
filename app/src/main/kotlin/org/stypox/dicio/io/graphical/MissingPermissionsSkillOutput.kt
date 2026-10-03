@@ -1,5 +1,7 @@
 package org.stypox.dicio.io.graphical
 
+import com.memeable.dicioai.R
+
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.SkillInfo
 import org.dicio.skill.skill.SkillOutput
-import org.stypox.dicio.R
 import org.stypox.dicio.settings.SkillSettingsItemPermissionLine
 import org.stypox.dicio.util.commaJoinPermissions
 import org.stypox.dicio.util.getString

@@ -1,5 +1,7 @@
 package org.stypox.dicio.io.wake
 
+import com.memeable.dicioai.R
+
 import android.Manifest.permission.RECORD_AUDIO
 import android.annotation.SuppressLint
 import android.app.NotificationChannel
@@ -31,7 +33,6 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import org.stypox.dicio.MainActivity
 import org.stypox.dicio.MainActivity.Companion.ACTION_WAKE_WORD
-import org.stypox.dicio.R
 import org.stypox.dicio.di.SttInputDeviceWrapper
 import org.stypox.dicio.di.WakeDeviceWrapper
 import org.stypox.dicio.eval.SkillEvaluator

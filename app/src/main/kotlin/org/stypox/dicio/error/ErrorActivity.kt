@@ -1,12 +1,13 @@
 package org.stypox.dicio.error
 
+import com.memeable.dicioai.R
+
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.core.content.IntentCompat
 import dagger.hilt.android.AndroidEntryPoint
 import org.stypox.dicio.BuildConfig
-import org.stypox.dicio.R
 import org.stypox.dicio.util.BaseActivity
 import org.stypox.dicio.util.ShareUtils
 import java.time.LocalDateTime

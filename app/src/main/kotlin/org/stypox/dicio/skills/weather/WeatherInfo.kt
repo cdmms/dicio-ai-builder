@@ -1,5 +1,7 @@
 package org.stypox.dicio.skills.weather
 
+import com.memeable.dicioai.R
+
 import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.layout.Column
@@ -19,7 +21,6 @@ import kotlinx.coroutines.launch
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.Skill
 import org.dicio.skill.skill.SkillInfo
-import org.stypox.dicio.R
 import org.stypox.dicio.sentences.Sentences
 import org.stypox.dicio.settings.ui.ListSetting
 import org.stypox.dicio.settings.ui.StringSetting

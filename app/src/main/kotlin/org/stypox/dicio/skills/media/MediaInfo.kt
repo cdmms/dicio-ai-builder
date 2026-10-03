@@ -1,5 +1,7 @@
 package org.stypox.dicio.skills.media
 
+import com.memeable.dicioai.R
+
 import android.content.Context
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -8,7 +10,6 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.Skill
 import org.dicio.skill.skill.SkillInfo
-import org.stypox.dicio.R
 import org.stypox.dicio.sentences.Sentences
 
 object MediaInfo : SkillInfo("media") {

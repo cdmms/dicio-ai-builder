@@ -1,5 +1,7 @@
 package org.stypox.dicio.di
 
+import com.memeable.dicioai.R
+
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
@@ -18,7 +20,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
-import org.stypox.dicio.R
 import org.stypox.dicio.io.input.InputEvent
 import org.stypox.dicio.io.input.SttInputDevice
 import org.stypox.dicio.io.input.SttState

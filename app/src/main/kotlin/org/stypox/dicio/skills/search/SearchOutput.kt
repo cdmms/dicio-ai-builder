@@ -1,5 +1,7 @@
 package org.stypox.dicio.skills.search
 
+import com.memeable.dicioai.R
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,7 +23,6 @@ import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.InteractionPlan
 import org.dicio.skill.skill.SkillOutput
 import org.dicio.skill.skill.Specificity
-import org.stypox.dicio.R
 import org.stypox.dicio.io.graphical.HeadlineSpeechSkillOutput
 import org.stypox.dicio.sentences.Sentences
 import org.stypox.dicio.skills.search.SearchOutput.Data

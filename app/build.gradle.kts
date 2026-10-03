@@ -93,7 +93,7 @@ tasks.withType<Test>().configureEach {
 
 protobuf {
     protoc {
-        artifact = libs.protobuf.protoc.get().toString()
+        path = "/data/data/com.termux/files/usr/bin/protoc"
     }
     plugins {
         generateProtoTasks {

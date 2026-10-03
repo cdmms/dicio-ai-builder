@@ -1,5 +1,7 @@
 package org.stypox.dicio.settings
 
+import com.memeable.dicioai.R
+
 import android.app.Application
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -31,7 +33,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import org.stypox.dicio.R
 import org.stypox.dicio.io.input.SttInputDevice
 import org.stypox.dicio.settings.datastore.InputDevice
 import org.stypox.dicio.settings.datastore.Language

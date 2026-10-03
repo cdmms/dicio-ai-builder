@@ -1,5 +1,7 @@
 package org.stypox.dicio.io.input.external_popup
 
+import com.memeable.dicioai.R
+
 import android.app.Activity.RESULT_CANCELED
 import android.app.Activity.RESULT_OK
 import android.content.Context
@@ -14,7 +16,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import org.stypox.dicio.R
 import org.stypox.dicio.di.ActivityForResultManager
 import org.stypox.dicio.di.LocaleManager
 import org.stypox.dicio.io.input.InputEvent

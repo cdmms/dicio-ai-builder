@@ -1,5 +1,7 @@
 package org.stypox.dicio.skills.flashlight
 
+import com.memeable.dicioai.R
+
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
@@ -10,7 +12,6 @@ import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import org.dicio.skill.context.SkillContext
 import org.dicio.skill.skill.Skill
 import org.dicio.skill.skill.SkillInfo
-import org.stypox.dicio.R
 import org.stypox.dicio.sentences.Sentences
 
 object FlashlightInfo : SkillInfo("flashlight") {

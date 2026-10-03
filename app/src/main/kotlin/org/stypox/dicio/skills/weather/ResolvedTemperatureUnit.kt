@@ -1,9 +1,9 @@
 package org.stypox.dicio.skills.weather
 
+import com.memeable.dicioai.R
+
 import androidx.annotation.StringRes
 import androidx.core.text.util.LocalePreferences
-import org.stypox.dicio.R
-
 enum class ResolvedTemperatureUnit(
     @StringRes
     val unitString: Int,

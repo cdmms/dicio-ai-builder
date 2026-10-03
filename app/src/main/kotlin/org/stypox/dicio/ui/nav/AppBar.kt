@@ -1,5 +1,7 @@
 package org.stypox.dicio.ui.nav
 
+import com.memeable.dicioai.R
+
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -50,7 +52,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.stypox.dicio.R
 import org.stypox.dicio.ui.theme.AppTheme
 
 @Composable

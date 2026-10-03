@@ -1,5 +1,7 @@
 package org.stypox.dicio.ui.nav
 
+import com.memeable.dicioai.R
+
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,8 +33,6 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import org.stypox.dicio.R
-
 @Composable
 fun DrawerContent(
     onSettingsClick: () -> Unit,
