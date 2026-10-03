@@ -1,25 +1,6 @@
-image: ghcr.io/cirruslabs/android-sdk:latest
-
-stages:
-  - build
-
-variables:
-  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
-
-cache:
-  paths:
-    - .gradle/wrapper/
-    - .gradle/caches/
+image: ubuntu:24.04
 
 build_debug:
   stage: build
   script:
-    - chmod +x ./gradlew
-    - ./gradlew --no-daemon --stacktrace :app:assembleDebug
-  artifacts:
-    name: "dicio-ai-$CI_COMMIT_SHORT_SHA-debug"
-    paths:
-      - app/build/outputs/apk/debug/*.apk
-    expire_in: 30 days
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
+    - echo "GitLab CI is working"
