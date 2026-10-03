@@ -1,0 +1,35 @@
+image: ghcr.io/cirruslabs/android-sdk:latest
+
+stages:
+  - build
+
+variables:
+  ANDROID_HOME: "/opt/android-sdk-linux"
+  ANDROID_SDK_ROOT: "/opt/android-sdk-linux"
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+
+cache:
+  key: gradle
+  paths:
+    - .gradle/wrapper/
+    - .gradle/caches/
+
+before_script:
+  - export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+  - java -version
+  - sdkmanager --version
+  - yes | sdkmanager --licenses >/dev/null || true
+  - sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
+
+build_debug:
+  stage: build
+  script:
+    - chmod +x ./gradlew
+    - ./gradlew --no-daemon --stacktrace :app:assembleDebug
+  artifacts:
+    name: "dicio-ai-$CI_COMMIT_SHORT_SHA-debug"
+    paths:
+      - app/build/outputs/apk/debug/*.apk
+    expire_in: 30 days
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
