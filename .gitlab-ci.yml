@@ -1,5 +1,8 @@
 image: ubuntu:24.04
 
+stages:
+  - build
+
 build_debug:
   stage: build
   script:
