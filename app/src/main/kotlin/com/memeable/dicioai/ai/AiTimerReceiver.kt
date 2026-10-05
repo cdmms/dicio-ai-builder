@@ -13,7 +13,7 @@ import android.os.Build
 class AiTimerReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         val channelId = "dicio_ai_timers"
-        val manager = context.getSystemService(NotificationManager::class.java)
+        val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) manager.createNotificationChannel(NotificationChannel(channelId, "Dicio AI timers", NotificationManager.IMPORTANCE_HIGH))
         val launch = PendingIntent.getActivity(context, 10, Intent(context, AiAgentActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) android.app.Notification.Builder(context, channelId) else @Suppress("DEPRECATION") android.app.Notification.Builder(context)
