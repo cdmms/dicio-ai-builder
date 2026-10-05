@@ -537,6 +537,7 @@ private object SecureSecretStore {
         }.getOrNull()
     }
 
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.M)
     private fun getOrCreateKey(): SecretKey {
         val ks = KeyStore.getInstance(STORE).apply { load(null) }
         (ks.getKey(ALIAS, null) as? SecretKey)?.let { return it }
