@@ -345,6 +345,16 @@ class AiAgentEngine(private val context: Context) {
             "accessibility_status" -> AgentAccessibilityService.status()
             "open_accessibility_settings" -> { openAccessibilitySettings(); "Opened Android Accessibility settings." }
             "read_screen" -> AgentAccessibilityService.readVisibleUi()
+            "inspect_screen" -> AgentAccessibilityService.inspectVisibleUi()
+            "capture_screen" -> AgentAccessibilityService.captureScreenDataUrl()
+            "analyze_screen" -> analyzeScreen(args["instruction"]?.jsonPrimitive?.contentOrNull.orEmpty())
+            "click_node" -> AgentAccessibilityService.clickNode(
+                args["index"]?.jsonPrimitive?.intOrNull ?: return@withContext "index is required."
+            )
+            "input_text" -> AgentAccessibilityService.setText(
+                args["label"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+                args["text"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            )
             "press_back" -> AgentAccessibilityService.globalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
             "press_home" -> AgentAccessibilityService.globalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
             "open_recents" -> AgentAccessibilityService.globalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS)
