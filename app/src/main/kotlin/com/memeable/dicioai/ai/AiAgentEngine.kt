@@ -104,7 +104,7 @@ class AiAgentEngine(private val context: Context) {
     private var nextId = 0L
     private var pendingContinuation: PendingContinuation? = null
 
-    private val _messages = mutableStateOf(loadHistory().toMutableList())
+    private val _messages = mutableStateOf<List<AiUiMessage>>(loadHistory())
     private val _events = mutableStateOf<List<AiAgentEvent>>(emptyList())
     private val _busy = mutableStateOf(false)
     private val _pendingConfirmation = mutableStateOf<PendingConfirmation?>(null)
@@ -198,7 +198,7 @@ class AiAgentEngine(private val context: Context) {
     fun clearHistory() {
         prefs.edit().remove("history").apply()
         scope.launch(Dispatchers.Main.immediate) {
-            _messages.value = mutableListOf()
+            _messages.value = emptyList()
         }
     }
 
