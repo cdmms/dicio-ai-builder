@@ -18,6 +18,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
@@ -197,7 +198,7 @@ class AiAgentEngine(private val context: Context) {
     fun clearHistory() {
         prefs.edit().remove("history").apply()
         scope.launch(Dispatchers.Main.immediate) {
-            _messages.value = emptyList()
+            _messages.value = mutableListOf()
         }
     }
 
@@ -310,7 +311,7 @@ class AiAgentEngine(private val context: Context) {
     private fun objectParams(name: String, type: String): JsonObject = buildJsonObject {
         put("type", "object")
         putJsonObject("properties") { putJsonObject(name) { put("type", type) } }
-        putJsonArray("required") { add(name) }
+        putJsonArray("required") { add(JsonPrimitive(name)) }
     }
 
     private fun objectParams2(fields: Map<String, String>): JsonObject = buildJsonObject {
@@ -318,7 +319,7 @@ class AiAgentEngine(private val context: Context) {
         putJsonObject("properties") {
             fields.forEach { (name, type) -> putJsonObject(name) { put("type", type) } }
         }
-        putJsonArray("required") { fields.keys.forEach { add(it) } }
+        putJsonArray("required") { fields.keys.forEach { add(JsonPrimitive(it)) } }
     }
 
     private fun emptyParams(): JsonObject = buildJsonObject {
@@ -419,7 +420,7 @@ class AiAgentEngine(private val context: Context) {
         val pm = context.packageManager
         return pm.getInstalledApplications(0)
             .mapNotNull { info -> pm.getLaunchIntentForPackage(info.packageName)?.let { pm.getApplicationLabel(info).toString() } }
-            .sorted(String.CASE_INSENSITIVE_ORDER)
+            .sortedWith(String.CASE_INSENSITIVE_ORDER)
             .take(80)
             .joinToString(", ")
             .ifBlank { "No launchable apps found." }
@@ -490,7 +491,7 @@ class AiAgentEngine(private val context: Context) {
         const val DEFAULT_ENDPOINT = "https://openrouter.ai/api/v1"
         const val DEFAULT_MODEL = "openrouter/free"
         const val DEFAULT_VISION_MODEL = "openrouter/free"
-        const val DEFAULT_SYSTEM_PROMPT = """
+        val DEFAULT_SYSTEM_PROMPT = """
 You are Dicio AI 0.4, an Android AI agent and controlled phone operator.
 Be concise, practical, and action-oriented. Prefer using available tools over explaining how the user could do something manually.
 For multi-step requests, execute the smallest useful sequence of tools and use each result to decide what comes next.

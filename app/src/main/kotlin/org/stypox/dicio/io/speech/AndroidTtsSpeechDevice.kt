@@ -1,6 +1,6 @@
 package org.stypox.dicio.io.speech
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import android.content.Context
 import android.speech.tts.TextToSpeech

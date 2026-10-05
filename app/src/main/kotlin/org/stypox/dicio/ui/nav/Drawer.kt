@@ -1,6 +1,7 @@
 package org.stypox.dicio.ui.nav
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
+
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
@@ -105,7 +106,7 @@ fun DrawerContent(
 @Preview
 @Composable
 private fun DrawerContentPreview() {
-    DrawerContent(onSettingsClick = {}, onAboutClick = {}, onSpeechToTextPopupClick = {}, closeDrawer = {})
+    DrawerContent(onSettingsClick = {}, onAboutClick = {}, onSpeechToTextPopupClick = {}, onAiAgentClick = {}, closeDrawer = {})
 }
 
 @Preview

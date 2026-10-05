@@ -1,6 +1,6 @@
 package org.stypox.dicio.io.graphical
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

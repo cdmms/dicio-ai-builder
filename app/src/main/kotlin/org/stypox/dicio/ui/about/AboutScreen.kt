@@ -2,7 +2,8 @@
 
 package org.stypox.dicio.ui.about
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
+
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image

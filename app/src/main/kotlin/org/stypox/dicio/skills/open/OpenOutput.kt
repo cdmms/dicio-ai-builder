@@ -1,6 +1,7 @@
 package org.stypox.dicio.skills.open
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
+
 
 import android.content.pm.PackageManager
 import android.util.Log

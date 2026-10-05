@@ -1,6 +1,6 @@
 package org.stypox.dicio.io.input.external_popup
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import android.app.Activity.RESULT_CANCELED
 import android.app.Activity.RESULT_OK

@@ -111,7 +111,7 @@ class AgentAccessibilityService : AccessibilityService() {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return "Screen capture requires Android 11 or newer."
             return suspendCancellableCoroutine { continuation ->
                 val executor: Executor = service.mainExecutor
-                service.takeScreenshot(Display.DEFAULT_DISPLAY, executor, object : AccessibilityService.TakeScreenshotCallback() {
+                service.takeScreenshot(Display.DEFAULT_DISPLAY, executor, object : AccessibilityService.TakeScreenshotCallback {
                     override fun onSuccess(screenshot: AccessibilityService.ScreenshotResult) {
                         try {
                             val buffer: HardwareBuffer = screenshot.hardwareBuffer

@@ -1,6 +1,6 @@
 package org.stypox.dicio.skills.flashlight
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column

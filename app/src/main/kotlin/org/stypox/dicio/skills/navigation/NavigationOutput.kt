@@ -1,6 +1,6 @@
 package org.stypox.dicio.skills.navigation
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import org.dicio.skill.context.SkillContext
 import org.stypox.dicio.io.graphical.HeadlineSpeechSkillOutput

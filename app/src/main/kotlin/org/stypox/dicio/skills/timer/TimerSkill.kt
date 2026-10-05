@@ -1,6 +1,6 @@
 package org.stypox.dicio.skills.timer
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import android.media.Ringtone
 import android.media.RingtoneManager

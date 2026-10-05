@@ -1,6 +1,7 @@
 package org.stypox.dicio.error
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
+
 
 import android.os.Build
 import android.os.Bundle

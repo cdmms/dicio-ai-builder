@@ -1,6 +1,6 @@
 package org.stypox.dicio.io.wake
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import android.Manifest.permission.RECORD_AUDIO
 import android.annotation.SuppressLint

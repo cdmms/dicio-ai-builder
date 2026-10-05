@@ -1,6 +1,6 @@
 package com.memeable.dicioai.ai
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import android.app.NotificationChannel
 import android.app.NotificationManager

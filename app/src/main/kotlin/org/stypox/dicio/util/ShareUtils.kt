@@ -1,8 +1,6 @@
 package org.stypox.dicio.util
 
-import com.memeable.dicioai.R
-
-import com.memeable.dicioai.main.R
+import org.stypox.dicio.R
 
 import android.content.ActivityNotFoundException
 import android.content.ClipData

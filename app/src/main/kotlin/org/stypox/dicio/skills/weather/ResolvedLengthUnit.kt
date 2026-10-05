@@ -1,6 +1,6 @@
 package org.stypox.dicio.skills.weather
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import android.icu.util.LocaleData
 import android.icu.util.ULocale

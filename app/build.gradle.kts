@@ -26,7 +26,7 @@ plugins {
 }
 
 android {
-    namespace = "com.memeable.dicioai"
+    namespace = "org.stypox.dicio"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {

@@ -1,6 +1,6 @@
 package org.stypox.dicio.ui.home
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons

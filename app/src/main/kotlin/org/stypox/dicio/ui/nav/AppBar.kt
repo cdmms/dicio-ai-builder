@@ -1,6 +1,6 @@
 package org.stypox.dicio.ui.nav
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import android.view.KeyEvent
 import androidx.activity.compose.BackHandler

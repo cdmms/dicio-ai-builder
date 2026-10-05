@@ -1,6 +1,6 @@
 package org.stypox.dicio.skills.telephone
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource

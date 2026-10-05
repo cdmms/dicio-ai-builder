@@ -1,6 +1,6 @@
 package org.stypox.dicio.io.input.stt_popup
 
-import com.memeable.dicioai.R
+import org.stypox.dicio.R
 
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement

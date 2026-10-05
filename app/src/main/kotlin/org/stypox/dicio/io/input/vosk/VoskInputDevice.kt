@@ -19,6 +19,8 @@
 
 package org.stypox.dicio.io.input.vosk
 
+import org.stypox.dicio.R
+
 import android.content.Context
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext

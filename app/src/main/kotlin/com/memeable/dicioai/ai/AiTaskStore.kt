@@ -1,4 +1,4 @@
-package org.stypox.dicio.ai
+package com.memeable.dicioai.ai
 
 import android.content.Context
 import kotlinx.serialization.Serializable
