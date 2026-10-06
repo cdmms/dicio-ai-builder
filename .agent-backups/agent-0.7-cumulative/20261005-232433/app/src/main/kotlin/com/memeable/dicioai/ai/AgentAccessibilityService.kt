@@ -21,7 +21,6 @@ class AgentAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         instance = this
-        lastKnownScreenSignature = currentSignatureInternal()
     }
 
     override fun onAccessibilityEvent(event: android.view.accessibility.AccessibilityEvent?) {
@@ -60,16 +59,10 @@ class AgentAccessibilityService : AccessibilityService() {
         else
             "UI control is not enabled. Ask the user to enable Dicio AI in Android Accessibility settings."
 
-        fun currentPackageName(): String =
-            instance?.rootInActiveWindow?.packageName?.toString().orEmpty()
-
-        fun currentActivityName(): String =
-            instance?.rootInActiveWindow?.className?.toString().orEmpty()
-
         fun readVisibleUi(): String {
             val service = instance ?: return "Accessibility service is not enabled."
             val root = service.rootInActiveWindow ?: return "No active window is available."
-            val out = StringBuilder("ACTIVE SCREEN\n")
+            val out = StringBuilder().apply { append("ACTIVE SCREEN\n") }
             service.collect(root, out, 0)
             val result = out.toString().take(MAX_CHARS)
             lastKnownScreenSignature = service.currentSignatureInternal()
@@ -81,6 +74,7 @@ class AgentAccessibilityService : AccessibilityService() {
             val root = service.rootInActiveWindow ?: return "No active window is available."
             val out = StringBuilder("VISIBLE UI ELEMENTS\n")
             var index = 0
+
             fun walk(node: AccessibilityNodeInfo?, depth: Int) {
                 if (node == null || out.length >= MAX_CHARS || depth > 10) return
                 val text = node.text?.toString()?.trim().orEmpty()
@@ -88,17 +82,20 @@ class AgentAccessibilityService : AccessibilityService() {
                 val interesting = node.isVisibleToUser &&
                     (text.isNotBlank() || desc.isNotBlank() || node.isClickable || node.isScrollable || node.isEditable)
                 if (interesting) {
-                    val r = Rect(); node.getBoundsInScreen(r)
+                    val r = Rect()
+                    node.getBoundsInScreen(r)
                     out.append("[$index] text=${text.take(100)} desc=${desc.take(100)} ")
                         .append("class=${node.className?.toString()?.substringAfterLast('.') ?: ""} ")
                         .append("bounds=${r.left},${r.top},${r.right},${r.bottom}")
                     if (node.isClickable) out.append(" clickable")
                     if (node.isScrollable) out.append(" scrollable")
                     if (node.isEditable) out.append(" editable")
-                    out.append('\n'); index++
+                    out.append('\n')
+                    index++
                 }
                 for (i in 0 until node.childCount) walk(node.getChild(i), depth + 1)
             }
+
             walk(root, 0)
             val result = out.toString().take(MAX_CHARS)
             lastKnownScreenSignature = service.currentSignatureInternal()
@@ -160,24 +157,21 @@ class AgentAccessibilityService : AccessibilityService() {
             val root = service.rootInActiveWindow ?: return "No active window is available."
             val target = service.findBestNode(root, label.lowercase())
                 ?: return "No visible element matched '$label'."
-            if (service.tryClickNodeAndParents(target)) {
+            return if (service.tryClickNodeAndParents(target)) {
                 lastKnownScreenSignature = service.currentSignatureInternal()
-                return "Clicked visible element '$label'."
+                "Clicked visible element '$label'."
+            } else {
+                "The visible element '$label' could not be clicked."
             }
-            val secondRoot = service.rootInActiveWindow
-            val secondTarget = secondRoot?.let { service.findBestNode(it, label.lowercase()) }
-            if (secondTarget != null && service.tryClickNodeAndParents(secondTarget)) {
-                lastKnownScreenSignature = service.currentSignatureInternal()
-                return "Clicked visible element '$label' after re-inspection."
-            }
-            return "The visible element '$label' could not be clicked."
         }
 
         fun clickNode(index: Int): String {
             val service = instance ?: return "Accessibility service is not enabled."
             if (index < 0) return "Node index must be non-negative."
             val root = service.rootInActiveWindow ?: return "No active window is available."
-            var current = 0; var matched: AccessibilityNodeInfo? = null
+            var current = 0
+            var matched: AccessibilityNodeInfo? = null
+
             fun walk(node: AccessibilityNodeInfo?): Boolean {
                 if (node == null) return false
                 val text = node.text?.toString()?.trim().orEmpty()
@@ -185,17 +179,32 @@ class AgentAccessibilityService : AccessibilityService() {
                 val interesting = node.isVisibleToUser &&
                     (text.isNotBlank() || desc.isNotBlank() || node.isClickable || node.isScrollable || node.isEditable)
                 if (interesting) {
-                    if (current == index) { matched = node; return true }
+                    if (current == index) {
+                        matched = node
+                        return true
+                    }
                     current++
                 }
                 for (i in 0 until node.childCount) if (walk(node.getChild(i))) return true
                 return false
             }
+
             walk(root)
             val target = matched ?: return "No visible UI element matched index $index."
             if (service.tryClickNodeAndParents(target)) {
                 lastKnownScreenSignature = service.currentSignatureInternal()
                 return "Clicked UI element index $index."
+            }
+
+            val label = target.text?.toString()?.trim()?.takeIf { it.isNotBlank() }
+                ?: target.contentDescription?.toString()?.trim().orEmpty()
+            if (label.isNotBlank()) {
+                val retryRoot = service.rootInActiveWindow
+                val retryTarget = retryRoot?.let { service.findBestNode(it, label.lowercase()) }
+                if (retryTarget != null && service.tryClickNodeAndParents(retryTarget)) {
+                    lastKnownScreenSignature = service.currentSignatureInternal()
+                    return "Clicked UI element index $index after re-inspection."
+                }
             }
             return "The UI element at index $index could not be clicked."
         }
@@ -203,27 +212,20 @@ class AgentAccessibilityService : AccessibilityService() {
         fun setText(label: String, value: String): String {
             val service = instance ?: return "Accessibility service is not enabled."
             val root = service.rootInActiveWindow ?: return "No active window is available."
-            var target = if (label.isBlank()) root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-            else service.findEditableNode(root, label.lowercase())
-            if (target == null && label.isNotBlank()) target = service.findFirstEditable(root)
-            target ?: return "No visible editable element matched '$label'."
+            val target = if (label.isBlank()) root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                else service.findEditableNode(root, label.lowercase())
+                ?: service.findFirstEditable(root)
+            ?: return "No visible editable element matched '$label'."
             if (!target.isEditable) return "The matched element '$label' is not editable."
+
             target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
             val args = android.os.Bundle().apply {
                 putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value)
             }
-            if (target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args))
-                return "Entered text into '${label.ifBlank { "focused field" }}'."
-            SystemClock.sleep(120)
-            val retryRoot = service.rootInActiveWindow
-            val retry = if (label.isBlank()) retryRoot?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-            else retryRoot?.let { service.findEditableNode(it, label.lowercase()) }
-            return if (retry != null) {
-                retry.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-                if (retry.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args))
-                    "Entered text into '${label.ifBlank { "focused field" }}' after retry."
-                else "Could not enter text into '${label.ifBlank { "focused field" }}'."
-            } else "Could not enter text into '${label.ifBlank { "focused field" }}'."
+            return if (target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args))
+                "Entered text into '${label.ifBlank { "focused field" }}'."
+            else
+                "Could not enter text into '${label.ifBlank { "focused field" }}'."
         }
 
         fun clearText(label: String): String = setText(label, "")
@@ -240,8 +242,8 @@ class AgentAccessibilityService : AccessibilityService() {
             val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
                 ?: service.findFirstEditable(root)
                 ?: return "No focused or editable field is available."
-            return if (focused.performAction(AccessibilityNodeInfo.ACTION_IME_ENTER)) "Pressed Enter."
-            else "The focused field did not accept Enter."
+            return if (focused.performAction(AccessibilityNodeInfo.ACTION_IME_ENTER))
+                "Pressed Enter." else "The focused field did not accept Enter."
         }
 
         suspend fun longPress(x: Int, y: Int, durationMs: Long): String {
@@ -262,7 +264,10 @@ class AgentAccessibilityService : AccessibilityService() {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return "Swipe gestures require Android 7.0 or newer."
             if (minOf(x1, y1, x2, y2) < 0) return "Coordinates must be non-negative."
             val duration = durationMs.coerceIn(100L, 5000L)
-            fun path() = Path().apply { moveTo(x1.toFloat(), y1.toFloat()); lineTo(x2.toFloat(), y2.toFloat()) }
+            fun path() = Path().apply {
+                moveTo(x1.toFloat(), y1.toFloat())
+                lineTo(x2.toFloat(), y2.toFloat())
+            }
             val first = service.dispatchPathGesture(path(), duration)
             if (first.startsWith("Gesture completed")) return "Swiped from ($x1, $y1) to ($x2, $y2)."
             delay(150L)
@@ -284,17 +289,6 @@ class AgentAccessibilityService : AccessibilityService() {
             else "The screen tap was not accepted: $retry"
         }
 
-        fun scroll(direction: String): String {
-            val service = instance ?: return "Accessibility service is not enabled."
-            val root = service.rootInActiveWindow ?: return "No active window is available."
-            val scrollNode = service.findScrollable(root) ?: return "No visible scrollable container is available."
-            val action = if (direction.equals("backward", true) || direction.equals("up", true) || direction.equals("left", true))
-                AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
-            else AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
-            return if (scrollNode.performAction(action)) "Scrolled ${direction.ifBlank { "forward" }}."
-            else "The visible container did not accept the scroll."
-        }
-
         suspend fun scrollUntilVisible(label: String, direction: String, timeoutMs: Long): String {
             val service = instance ?: return "Accessibility service is not enabled."
             if (label.isBlank()) return "Element label was empty."
@@ -304,9 +298,11 @@ class AgentAccessibilityService : AccessibilityService() {
                 val root = service.rootInActiveWindow ?: return "No active window is available."
                 val target = service.findBestNode(root, label.lowercase())
                 if (target != null) return "Element is visible: ${service.describeNode(target)}"
-                val scrollNode = service.findScrollable(root) ?: return "No scrollable container is visible while searching for '$label'."
+                val scrollNode = service.findScrollable(root)
+                    ?: return "No scrollable container is visible while searching for '$label'."
                 val action = if (direction.equals("backward", true) || direction.equals("up", true) || direction.equals("left", true))
-                    AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD else AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+                    AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+                else AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
                 if (!scrollNode.performAction(action)) return "The visible container did not scroll while searching for '$label'."
                 delay(350L)
             }
@@ -323,15 +319,24 @@ class AgentAccessibilityService : AccessibilityService() {
                         try {
                             val buffer: HardwareBuffer = screenshot.hardwareBuffer
                             val bitmap = Bitmap.wrapHardwareBuffer(buffer, screenshot.colorSpace)
-                            val safe = bitmap?.let { val copy = it.copy(Bitmap.Config.ARGB_8888, false); it.recycle(); copy }
+                            val safe = bitmap?.let {
+                                val copy = it.copy(Bitmap.Config.ARGB_8888, false)
+                                it.recycle()
+                                copy
+                            }
                             buffer.close()
-                            if (safe == null) { continuation.resume("Could not convert screenshot buffer."); return }
+                            if (safe == null) {
+                                continuation.resume("Could not convert screenshot buffer.")
+                                return
+                            }
                             val scaled = if (safe.width > 1440 || safe.height > 2560) {
                                 val scale = minOf(1440f / safe.width, 2560f / safe.height)
-                                Bitmap.createScaledBitmap(safe, (safe.width * scale).toInt(), (safe.height * scale).toInt(), true).also { safe.recycle() }
+                                Bitmap.createScaledBitmap(safe, (safe.width * scale).toInt(), (safe.height * scale).toInt(), true)
+                                    .also { safe.recycle() }
                             } else safe
                             val bytes = ByteArrayOutputStream().use { stream ->
-                                scaled.compress(Bitmap.CompressFormat.JPEG, 72, stream); stream.toByteArray()
+                                scaled.compress(Bitmap.CompressFormat.JPEG, 72, stream)
+                                stream.toByteArray()
                             }
                             scaled.recycle()
                             continuation.resume("data:image/jpeg;base64,${Base64.encodeToString(bytes, Base64.NO_WRAP)}")
@@ -352,11 +357,13 @@ class AgentAccessibilityService : AccessibilityService() {
 
         private fun AgentAccessibilityService.findBestNode(root: AccessibilityNodeInfo?, needle: String): AccessibilityNodeInfo? {
             if (root == null || needle.isBlank()) return null
-            var best: AccessibilityNodeInfo? = null; var bestScore = Int.MIN_VALUE
+            var best: AccessibilityNodeInfo? = null
+            var bestScore = Int.MIN_VALUE
             fun walk(node: AccessibilityNodeInfo?) {
                 if (node == null) return
                 if (node.isVisibleToUser) {
-                    val text = node.text?.toString()?.trim().orEmpty(); val desc = node.contentDescription?.toString()?.trim().orEmpty()
+                    val text = node.text?.toString()?.trim().orEmpty()
+                    val desc = node.contentDescription?.toString()?.trim().orEmpty()
                     val haystack = "$text $desc".lowercase()
                     if (haystack.contains(needle)) {
                         var score = 10
@@ -370,7 +377,8 @@ class AgentAccessibilityService : AccessibilityService() {
                 }
                 for (child in node.children()) walk(child)
             }
-            walk(root); return best
+            walk(root)
+            return best
         }
 
         private fun AgentAccessibilityService.findEditableNode(root: AccessibilityNodeInfo?, needle: String): AccessibilityNodeInfo? {
@@ -378,12 +386,17 @@ class AgentAccessibilityService : AccessibilityService() {
             var best: AccessibilityNodeInfo? = null
             fun walk(node: AccessibilityNodeInfo?) {
                 if (node == null || best != null) return
-                val text = node.text?.toString()?.trim().orEmpty(); val desc = node.contentDescription?.toString()?.trim().orEmpty()
+                val text = node.text?.toString()?.trim().orEmpty()
+                val desc = node.contentDescription?.toString()?.trim().orEmpty()
                 val haystack = "$text $desc".lowercase()
-                if (node.isVisibleToUser && node.isEditable && (needle.isBlank() || haystack.contains(needle))) { best = node; return }
+                if (node.isVisibleToUser && node.isEditable && (needle.isBlank() || haystack.contains(needle))) {
+                    best = node
+                    return
+                }
                 for (child in node.children()) walk(child)
             }
-            walk(root); return best
+            walk(root)
+            return best
         }
 
         private fun AgentAccessibilityService.findFirstEditable(root: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
@@ -394,7 +407,8 @@ class AgentAccessibilityService : AccessibilityService() {
         }
 
         private fun AgentAccessibilityService.clickableChain(node: AccessibilityNodeInfo): List<AccessibilityNodeInfo> {
-            val result = mutableListOf<AccessibilityNodeInfo>(); var current: AccessibilityNodeInfo? = node
+            val result = mutableListOf<AccessibilityNodeInfo>()
+            var current: AccessibilityNodeInfo? = node
             repeat(5) {
                 if (current == null) return@repeat
                 if (current!!.isVisibleToUser && current!!.isClickable) result += current!!
@@ -404,12 +418,16 @@ class AgentAccessibilityService : AccessibilityService() {
             return result.distinctBy { System.identityHashCode(it) }
         }
 
-        private fun AgentAccessibilityService.tryClickNodeAndParents(node: AccessibilityNodeInfo): Boolean =
-            clickableChain(node).any { it.performAction(AccessibilityNodeInfo.ACTION_CLICK) }
+        private fun AgentAccessibilityService.tryClickNodeAndParents(node: AccessibilityNodeInfo): Boolean {
+            for (candidate in clickableChain(node)) if (candidate.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return true
+            return false
+        }
 
         private fun AgentAccessibilityService.describeNode(node: AccessibilityNodeInfo): String {
-            val rect = Rect(); node.getBoundsInScreen(rect)
-            val text = node.text?.toString()?.trim().orEmpty(); val desc = node.contentDescription?.toString()?.trim().orEmpty()
+            val rect = Rect()
+            node.getBoundsInScreen(rect)
+            val text = node.text?.toString()?.trim().orEmpty()
+            val desc = node.contentDescription?.toString()?.trim().orEmpty()
             val cls = node.className?.toString()?.substringAfterLast('.').orEmpty()
             return buildString {
                 append("text=\"${text.take(120)}\" desc=\"${desc.take(120)}\" class=$cls ")
@@ -429,8 +447,10 @@ class AgentAccessibilityService : AccessibilityService() {
 
         private fun AgentAccessibilityService.currentSignatureInternal(): String? {
             val root = rootInActiveWindow ?: return null
-            val packageName = root.packageName?.toString().orEmpty(); val className = root.className?.toString().orEmpty()
-            return "$packageName|$className|${inspectVisibleUiInternal(root).hashCode()}"
+            val packageName = root.packageName?.toString().orEmpty()
+            val className = root.className?.toString().orEmpty()
+            val visible = inspectVisibleUiInternal(root)
+            return "$packageName|$className|${visible.hashCode()}"
         }
 
         private fun inspectVisibleUiInternal(root: AccessibilityNodeInfo): String {
@@ -438,25 +458,32 @@ class AgentAccessibilityService : AccessibilityService() {
             fun walk(node: AccessibilityNodeInfo?, depth: Int) {
                 if (node == null || out.length >= 6000 || depth > 8) return
                 if (node.isVisibleToUser) {
-                    val text = node.text?.toString()?.trim().orEmpty(); val desc = node.contentDescription?.toString()?.trim().orEmpty()
+                    val text = node.text?.toString()?.trim().orEmpty()
+                    val desc = node.contentDescription?.toString()?.trim().orEmpty()
                     if (text.isNotBlank() || desc.isNotBlank() || node.isClickable || node.isScrollable || node.isEditable) {
-                        val rect = Rect(); node.getBoundsInScreen(rect)
-                        out.append(text.take(80)).append('|').append(desc.take(80)).append('|').append(node.className?.toString().orEmpty()).append('|')
+                        val rect = Rect()
+                        node.getBoundsInScreen(rect)
+                        out.append(text.take(80)).append('|').append(desc.take(80)).append('|')
+                            .append(node.className?.toString().orEmpty()).append('|')
                             .append(rect.left).append(',').append(rect.top).append(',').append(rect.right).append(',').append(rect.bottom)
                             .append('|').append(node.isClickable).append('|').append(node.isEditable).append('\n')
                     }
                 }
                 for (child in node.children()) walk(child, depth + 1)
             }
-            walk(root, 0); return out.toString()
+            walk(root, 0)
+            return out.toString()
         }
 
         private suspend fun AgentAccessibilityService.dispatchPathGesture(path: Path, durationMs: Long): String =
             suspendCancellableCoroutine { continuation ->
                 if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) {
-                    continuation.resume("Gestures require Android 7.0 or newer."); return@suspendCancellableCoroutine
+                    continuation.resume("Gestures require Android 7.0 or newer.")
+                    return@suspendCancellableCoroutine
                 }
-                val gesture = GestureDescription.Builder().addStroke(GestureDescription.StrokeDescription(path, 0, durationMs)).build()
+                val gesture = GestureDescription.Builder()
+                    .addStroke(GestureDescription.StrokeDescription(path, 0, durationMs))
+                    .build()
                 val accepted = dispatchGesture(gesture, object : GestureResultCallback() {
                     override fun onCompleted(gestureDescription: GestureDescription?) { continuation.resume("Gesture completed.") }
                     override fun onCancelled(gestureDescription: GestureDescription?) { continuation.resume("Gesture cancelled.") }

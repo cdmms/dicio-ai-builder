@@ -75,16 +75,6 @@
         <receiver
             android:name="com.memeable.dicioai.ai.AiTimerReceiver"
             android:exported="false" />
-        <receiver
-            android:name="com.memeable.dicioai.ai.AiScheduledTaskReceiver"
-            android:exported="false" />
-        <receiver
-            android:name="com.memeable.dicioai.ai.AiScheduleBootReceiver"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.intent.action.BOOT_COMPLETED" />
-            </intent-filter>
-        </receiver>
         <service
             android:name="com.memeable.dicioai.ai.AgentAccessibilityService"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"

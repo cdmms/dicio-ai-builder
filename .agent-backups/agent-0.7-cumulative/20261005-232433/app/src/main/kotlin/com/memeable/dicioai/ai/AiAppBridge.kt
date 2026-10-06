@@ -10,8 +10,16 @@ object AiAppBridge {
     )
 
     fun foreground(): ForegroundInfo? {
-        val packageName = AgentAccessibilityService.currentPackageName().takeIf { it.isNotBlank() } ?: return null
-        val activityName = AgentAccessibilityService.currentActivityName()
+        val servicePackage = runCatching {
+            AgentAccessibilityService.currentPackageName()
+        }.getOrNull()
+
+        val serviceActivity = runCatching {
+            AgentAccessibilityService.currentActivityName()
+        }.getOrNull()
+
+        val packageName = servicePackage?.takeIf { it.isNotBlank() } ?: return null
+        val activityName = serviceActivity.orEmpty()
         return ForegroundInfo(packageName, activityName, packageName)
     }
 
@@ -33,6 +41,7 @@ object AiAppBridge {
     fun isAppOpen(context: Context, name: String): Boolean {
         if (name.isBlank()) return false
         val current = foreground(context) ?: return false
-        return current.packageName.equals(name, true) || current.appName.equals(name, true) || current.appName.contains(name, true)
+        return current.packageName.equals(name, true) || current.appName.equals(name, true) ||
+            current.appName.contains(name, true)
     }
 }

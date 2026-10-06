@@ -9,7 +9,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 
 class AiFilePickerActivity : ComponentActivity() {
     private val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) AiFileBridge.rememberSelectedUri(this, uri, displayName(uri))
+        if (uri != null) {
+            AiFileBridge.rememberSelectedUri(this, uri, displayName(uri))
+        }
         finish()
     }
 
@@ -18,9 +20,11 @@ class AiFilePickerActivity : ComponentActivity() {
         picker.launch(arrayOf("*/*"))
     }
 
-    private fun displayName(uri: Uri): String? = runCatching {
-        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor: Cursor ->
-            if (cursor.moveToFirst()) cursor.getString(0) else null
-        }
-    }.getOrNull()
+    private fun displayName(uri: Uri): String? {
+        return runCatching {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor: Cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }.getOrNull()
+    }
 }

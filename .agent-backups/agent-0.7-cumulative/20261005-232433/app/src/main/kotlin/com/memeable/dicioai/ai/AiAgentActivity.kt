@@ -25,7 +25,8 @@ class AiAgentActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1 && intent?.getBooleanExtra(EXTRA_AUTO_LISTEN, false) == true) {
-            setShowWhenLocked(true); setTurnScreenOn(true)
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
         }
         engine = AiAgentEngine(applicationContext)
         autoListen = intent?.getBooleanExtra(EXTRA_AUTO_LISTEN, false) == true
@@ -34,7 +35,9 @@ class AiAgentActivity : ComponentActivity() {
             AppTheme {
                 val agent = remember { engine }
                 LaunchedEffect(autoListen) { if (autoListen) launchVoiceInput() }
-                LaunchedEffect(scheduledRequest) { if (!scheduledRequest.isNullOrBlank()) engine.enqueue(scheduledRequest) }
+                LaunchedEffect(scheduledRequest) {
+                    if (!scheduledRequest.isNullOrBlank()) engine.enqueue(scheduledRequest)
+                }
                 AiAgentScreen(engine = agent, onBack = { finish() }, onVoice = { launchVoiceInput() })
             }
         }

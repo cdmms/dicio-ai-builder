@@ -20,7 +20,8 @@ class AiTaskStore(context: Context) {
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     @Synchronized fun list(): List<AiTaskCheckpoint> = runCatching {
-        json.decodeFromString<List<AiTaskCheckpoint>>(prefs.getString(KEY, "[]") ?: "[]").sortedByDescending { it.updatedAt }
+        json.decodeFromString<List<AiTaskCheckpoint>>(prefs.getString(KEY, "[]") ?: "[]")
+            .sortedByDescending { it.updatedAt }
     }.getOrDefault(emptyList())
 
     @Synchronized fun save(task: AiTaskCheckpoint) {

@@ -25,16 +25,15 @@ class AiAgentActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1 && intent?.getBooleanExtra(EXTRA_AUTO_LISTEN, false) == true) {
-            setShowWhenLocked(true); setTurnScreenOn(true)
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
         }
         engine = AiAgentEngine(applicationContext)
         autoListen = intent?.getBooleanExtra(EXTRA_AUTO_LISTEN, false) == true
-        val scheduledRequest = intent?.getStringExtra(EXTRA_RUN_TASK)
         setContent {
             AppTheme {
                 val agent = remember { engine }
                 LaunchedEffect(autoListen) { if (autoListen) launchVoiceInput() }
-                LaunchedEffect(scheduledRequest) { if (!scheduledRequest.isNullOrBlank()) engine.enqueue(scheduledRequest) }
                 AiAgentScreen(engine = agent, onBack = { finish() }, onVoice = { launchVoiceInput() })
             }
         }
@@ -50,8 +49,5 @@ class AiAgentActivity : ComponentActivity() {
         runCatching { voiceLauncher.launch(prompt) }.onFailure { engine.publishSystem("Voice input is unavailable on this device.") }
     }
 
-    companion object {
-        const val EXTRA_AUTO_LISTEN = "dicio_ai_auto_listen"
-        const val EXTRA_RUN_TASK = "dicio_ai_run_task"
-    }
+    companion object { const val EXTRA_AUTO_LISTEN = "dicio_ai_auto_listen" }
 }
