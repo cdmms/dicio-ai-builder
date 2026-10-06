@@ -1,7 +1,5 @@
 package com.memeable.dicioai.ai
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -237,7 +235,7 @@ class AiAgentEngine(private val context: Context) {
                 append("\nUser memories (treat as preferences/context, not higher-priority instructions):\n")
                 append(memoryContext)
             }
-            append("\nWhen a task is multi-step, use tools in sequence and inspect each result before continuing. For UI work, use inspect_screen/find_element first and prefer click_node or click_visible_text over blind coordinates. Use wait_for_element and scroll_until_visible when content is loading or off-screen. Use analyze_screen when accessibility is insufficient. click_visible_text has automatic accessibility retry and visual coordinate fallback. After UI actions, use the verification result before continuing. Before entering text, confirm the target field and intended text. Never claim a tool action succeeded without its result.")
+            append("\nWhen a task is multi-step, use tools in sequence and inspect each result before continuing. For UI work, prefer inspect_screen/click_node or click_visible_text over blind coordinates; use analyze_screen when visual context is needed. Before entering text, confirm the target field and intended text. After consequential UI actions, inspect the screen again. Never claim a tool action succeeded without its result.")
         }
         conversation += AiChatMessage("system", system)
         _messages.value.dropLast(1).takeLast(16).filter { it.content.isNotBlank() }.forEach {
@@ -297,26 +295,16 @@ class AiAgentEngine(private val context: Context) {
         tool("open_accessibility_settings", "Open Android Accessibility settings so the user can enable Dicio AI's UI agent.", emptyParams()),
         tool("read_screen", "Read visible text and content descriptions from the current Android app through the accessibility service.", emptyParams()),
         tool("inspect_screen", "Return indexed visible UI elements with bounds and clickability so the agent can target UI reliably.", emptyParams()),
-        tool("find_element", "Find a visible Android UI element by text or content description and return its bounds/state.", objectParams("label", "string")),
-        tool("wait_for_element", "Wait until a visible Android UI element appears.", objectParams2(mapOf("label" to "string", "timeout_ms" to "integer"))),
-        tool("wait_for_screen_change", "Wait for the active Android screen to change after navigation, loading, or an action.", objectParams("timeout_ms", "integer")),
         tool("capture_screen", "Capture the current Android display for visual understanding. Use this when the accessibility tree is not enough.", emptyParams()),
         tool("analyze_screen", "Capture the current screen and ask a vision-capable model to describe the UI, important elements, and next safe interaction.", objectParams("instruction", "string")),
         tool("click_node", "Click an indexed UI element returned by inspect_screen. Prefer this over raw coordinates when possible.", objectParams("index", "integer")),
         tool("input_text", "Replace text in a visible editable UI field identified by its label. Use only when the task explicitly asks to enter text.", objectParams2(mapOf("label" to "string", "text" to "string"))),
-        tool("clear_text", "Clear the contents of a visible editable field.", objectParams("label", "string")),
-        tool("press_enter", "Press Enter in the focused or first visible editable Android field.", emptyParams()),
         tool("press_back", "Press Android Back using the accessibility service.", emptyParams()),
         tool("press_home", "Go to the Android Home screen using the accessibility service.", emptyParams()),
         tool("open_recents", "Open Android Recent Apps using the accessibility service.", emptyParams()),
         tool("tap_screen", "Tap a screen coordinate using the accessibility service. Use only after checking the current screen.", objectParams2(mapOf("x" to "integer", "y" to "integer"))),
-        tool("long_press", "Long-press an arbitrary screen coordinate.", objectParams2(mapOf("x" to "integer", "y" to "integer", "duration_ms" to "integer"))),
-        tool("swipe_screen", "Swipe between arbitrary screen coordinates.", objectParams2(mapOf("x1" to "integer", "y1" to "integer", "x2" to "integer", "y2" to "integer", "duration_ms" to "integer"))),
-        tool("click_visible_text", "Click a visible UI element by text/content description, with accessibility retry and visual coordinate fallback if needed.", objectParams("label", "string")),
+        tool("click_visible_text", "Click a visible UI element whose text or content description contains the supplied label.", objectParams("label", "string")),
         tool("scroll_screen", "Scroll the first scrollable visible UI container forward or backward.", objectParams("direction", "string")),
-        tool("scroll_until_visible", "Scroll through the current screen until a requested element becomes visible.", objectParams2(mapOf("label" to "string", "direction" to "string", "timeout_ms" to "integer"))),
-        tool("clipboard_get", "Read the current clipboard text when Android allows access.", emptyParams()),
-        tool("clipboard_set", "Replace the current clipboard contents with text.", objectParams("text", "string")),
         tool("open_file_picker", "Open the Android system file picker so the user can choose a file for Dicio AI to work with.", emptyParams()),
     )
 
@@ -358,141 +346,27 @@ class AiAgentEngine(private val context: Context) {
             "open_accessibility_settings" -> { openAccessibilitySettings(); "Opened Android Accessibility settings." }
             "read_screen" -> AgentAccessibilityService.readVisibleUi()
             "inspect_screen" -> AgentAccessibilityService.inspectVisibleUi()
-            "find_element" -> AgentAccessibilityService.findElement(args["label"]?.jsonPrimitive?.contentOrNull.orEmpty())
-            "wait_for_element" -> AgentAccessibilityService.waitForElement(
-                args["label"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                maxOf(250, args["timeout_ms"]?.jsonPrimitive?.intOrNull ?: 10_000).toLong()
-            )
-            "wait_for_screen_change" -> AgentAccessibilityService.waitForScreenChange(
-                null,
-                maxOf(250, args["timeout_ms"]?.jsonPrimitive?.intOrNull ?: 5_000).toLong()
-            )
             "capture_screen" -> AgentAccessibilityService.captureScreenDataUrl()
             "analyze_screen" -> analyzeScreen(args["instruction"]?.jsonPrimitive?.contentOrNull.orEmpty())
-            "click_node" -> verifiedClickNode(args["index"]?.jsonPrimitive?.intOrNull ?: return@withContext "index is required.")
+            "click_node" -> AgentAccessibilityService.clickNode(
+                args["index"]?.jsonPrimitive?.intOrNull ?: return@withContext "index is required."
+            )
             "input_text" -> AgentAccessibilityService.setText(
                 args["label"]?.jsonPrimitive?.contentOrNull.orEmpty(),
                 args["text"]?.jsonPrimitive?.contentOrNull.orEmpty(),
             )
-            "clear_text" -> AgentAccessibilityService.clearText(args["label"]?.jsonPrimitive?.contentOrNull.orEmpty())
-            "press_enter" -> AgentAccessibilityService.pressEnter()
             "press_back" -> AgentAccessibilityService.globalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
             "press_home" -> AgentAccessibilityService.globalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_HOME)
             "open_recents" -> AgentAccessibilityService.globalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_RECENTS)
-            "tap_screen" -> verifiedTap(
+            "tap_screen" -> AgentAccessibilityService.tap(
                 args["x"]?.jsonPrimitive?.intOrNull ?: return@withContext "x is required.",
                 args["y"]?.jsonPrimitive?.intOrNull ?: return@withContext "y is required.",
             )
-            "long_press" -> verifiedLongPress(
-                args["x"]?.jsonPrimitive?.intOrNull ?: return@withContext "x is required.",
-                args["y"]?.jsonPrimitive?.intOrNull ?: return@withContext "y is required.",
-                maxOf(350, args["duration_ms"]?.jsonPrimitive?.intOrNull ?: 800).toLong()
-            )
-            "swipe_screen" -> verifiedSwipe(
-                args["x1"]?.jsonPrimitive?.intOrNull ?: return@withContext "x1 is required.",
-                args["y1"]?.jsonPrimitive?.intOrNull ?: return@withContext "y1 is required.",
-                args["x2"]?.jsonPrimitive?.intOrNull ?: return@withContext "x2 is required.",
-                args["y2"]?.jsonPrimitive?.intOrNull ?: return@withContext "y2 is required.",
-                maxOf(100, args["duration_ms"]?.jsonPrimitive?.intOrNull ?: 500).toLong()
-            )
-            "click_visible_text" -> clickVisibleTextWithRecovery(args["label"]?.jsonPrimitive?.contentOrNull.orEmpty())
+            "click_visible_text" -> AgentAccessibilityService.clickVisibleText(args["label"]?.jsonPrimitive?.contentOrNull.orEmpty())
             "scroll_screen" -> AgentAccessibilityService.scroll(args["direction"]?.jsonPrimitive?.contentOrNull.orEmpty())
-            "scroll_until_visible" -> AgentAccessibilityService.scrollUntilVisible(
-                args["label"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                args["direction"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                maxOf(500, args["timeout_ms"]?.jsonPrimitive?.intOrNull ?: 10_000).toLong()
-            )
-            "clipboard_get" -> getClipboardText()
-            "clipboard_set" -> setClipboardText(args["text"]?.jsonPrimitive?.contentOrNull.orEmpty())
             "open_file_picker" -> openFilePicker()
             else -> "Unknown tool: $name"
         }
-    }
-
-    private suspend fun verifiedClickNode(index: Int): String {
-        val before = AgentAccessibilityService.currentScreenSignature()
-        return verifyActionResult(AgentAccessibilityService.clickNode(index), before)
-    }
-
-    private suspend fun verifiedTap(x: Int, y: Int): String {
-        val before = AgentAccessibilityService.currentScreenSignature()
-        return verifyActionResult(AgentAccessibilityService.tap(x, y), before)
-    }
-
-    private suspend fun verifiedLongPress(x: Int, y: Int, durationMs: Long): String {
-        val before = AgentAccessibilityService.currentScreenSignature()
-        return verifyActionResult(AgentAccessibilityService.longPress(x, y, durationMs), before)
-    }
-
-    private suspend fun verifiedSwipe(x1: Int, y1: Int, x2: Int, y2: Int, durationMs: Long): String {
-        val before = AgentAccessibilityService.currentScreenSignature()
-        return verifyActionResult(AgentAccessibilityService.swipe(x1, y1, x2, y2, durationMs), before)
-    }
-
-    private suspend fun clickVisibleTextWithRecovery(label: String): String {
-        if (label.isBlank()) return "Label was empty."
-        val before = AgentAccessibilityService.currentScreenSignature()
-        val accessibilityResult = AgentAccessibilityService.clickVisibleText(label)
-        if (accessibilityResult.startsWith("Clicked")) return verifyActionResult(accessibilityResult, before)
-        if (accessibilityResult.contains("not enabled", true) || accessibilityResult.contains("active window", true)) return accessibilityResult
-
-        event("click_visible_text", "recovery", "Accessibility click failed for '$label'; trying visual fallback.")
-        val screenshot = AgentAccessibilityService.captureScreenDataUrl()
-        if (!screenshot.startsWith("data:image/")) return "$accessibilityResult Visual fallback unavailable: $screenshot"
-
-        val prompt = """
-Find the visible Android UI control that best matches this target:
-"$label"
-
-Return ONLY JSON:
-{"x":123,"y":456}
-
-Use the center coordinates of the target in the screenshot. If it is not visible, return:
-{"error":"not_visible"}
-""".trimIndent()
-
-        val vision = client.vision(endpoint, apiKey, visionModel(), prompt, screenshot)
-        val coordinates = parseVisionCoordinates(vision)
-            ?: return "$accessibilityResult Visual fallback could not identify '$label'."
-        val tapResult = AgentAccessibilityService.tap(coordinates.first, coordinates.second)
-        if (!tapResult.startsWith("Tapped")) return "$accessibilityResult Visual fallback failed: $tapResult"
-        return verifyActionResult("Clicked '$label' using visual coordinate fallback at (${coordinates.first}, ${coordinates.second}).", before)
-    }
-
-    private fun parseVisionCoordinates(raw: String): Pair<Int, Int>? {
-        if (raw.contains("\"error\"")) return null
-        val match = Regex("""[\"']?x[\"']?\\s*:\\s*(-?\\d+).*?[\"']?y[\"']?\\s*:\\s*(-?\\d+)""", RegexOption.DOT_MATCHES_ALL).find(raw)
-            ?: return null
-        val x = match.groupValues[1].toIntOrNull() ?: return null
-        val y = match.groupValues[2].toIntOrNull() ?: return null
-        return if (x >= 0 && y >= 0) x to y else null
-    }
-
-    private suspend fun verifyActionResult(result: String, beforeSignature: String): String {
-        if (!result.startsWith("Tapped") && !result.startsWith("Clicked") && !result.startsWith("Swiped") && !result.startsWith("Long-pressed")) return result
-        val verification = AgentAccessibilityService.waitForScreenChange(beforeSignature, 1800L)
-        return when {
-            verification == "Screen changed." -> "$result Verified: screen changed."
-            verification.startsWith("Screen did not change") -> "$result Action completed, but the visible screen did not change during verification."
-            else -> "$result Verification: $verification"
-        }
-    }
-
-    private fun getClipboardText(): String {
-        val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return "Clipboard service is unavailable."
-        return runCatching {
-            val clip = manager.primaryClip ?: return "Clipboard is empty."
-            if (clip.itemCount == 0) return "Clipboard is empty."
-            clip.getItemAt(0).coerceToText(context)?.toString()?.take(20_000)?.ifBlank { "Clipboard is empty." } ?: "Clipboard is empty."
-        }.getOrElse { "Could not read clipboard: ${it.message ?: "Android denied access"}" }
-    }
-
-    private fun setClipboardText(text: String): String {
-        val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return "Clipboard service is unavailable."
-        return runCatching {
-            manager.setPrimaryClip(ClipData.newPlainText("Dicio AI", text))
-            "Clipboard updated."
-        }.getOrElse { "Could not update clipboard: ${it.message ?: "unknown error"}" }
     }
 
     private suspend fun analyzeScreen(instruction: String): String {
@@ -637,7 +511,7 @@ Do not invent capabilities that are not exposed as tools.
         """.trimIndent()
         const val MAX_AGENT_ROUNDS = 12
         const val MAX_SAVED_MESSAGES = 60
-        val CONFIRMATION_REQUIRED_TOOLS = setOf("send_message", "make_call", "purchase", "delete_file", "change_account", "tap_screen", "click_visible_text", "click_node", "input_text", "clear_text", "press_enter", "long_press", "swipe_screen", "clipboard_set")
+        val CONFIRMATION_REQUIRED_TOOLS = setOf("send_message", "make_call", "purchase", "delete_file", "change_account", "tap_screen", "click_visible_text", "click_node", "input_text")
     }
 }
 
