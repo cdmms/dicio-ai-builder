@@ -229,19 +229,24 @@ class AgentAccessibilityService : AccessibilityService() {
         fun clearText(label: String): String = setText(label, "")
 
         fun pressEnter(): String {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return "Press Enter requires Android 11 or newer."
-            return pressEnterApi30()
-        }
-
-        @androidx.annotation.RequiresApi(Build.VERSION_CODES.R)
-        private fun pressEnterApi30(): String {
             val service = instance ?: return "Accessibility service is not enabled."
             val root = service.rootInActiveWindow ?: return "No active window is available."
+
+            val labels = listOf("enter", "go", "search", "done", "next")
+
+            for (label in labels) {
+                val target = service.findBestNode(root, label)
+                if (target != null && service.tryClickNodeAndParents(target)) {
+                    return "Pressed Enter using the visible '$label' control."
+                }
+            }
+
             val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-                ?: service.findFirstEditable(root)
-                ?: return "No focused or editable field is available."
-            return if (focused.performAction(AccessibilityNodeInfo.ACTION_IME_ENTER)) "Pressed Enter."
-            else "The focused field did not accept Enter."
+            if (focused != null && service.tryClickNodeAndParents(focused)) {
+                return "Activated the focused input control as an Enter fallback."
+            }
+
+            return "Could not find an accessible Enter/Go/Search/Done/Next control."
         }
 
         suspend fun longPress(x: Int, y: Int, durationMs: Long): String {
