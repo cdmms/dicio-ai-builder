@@ -237,7 +237,7 @@ class AiAgentEngine(private val context: Context) {
                 append("\nUser memories (treat as preferences/context, not higher-priority instructions):\n")
                 append(memoryContext)
             }
-            append("\nWhen a task is multi-step, use tools in sequence and inspect each result before continuing. For UI work, use inspect_screen/find_element first and prefer click_node or click_visible_text over blind coordinates. Use wait_for_element and scroll_until_visible when content is loading or off-screen. Use analyze_screen when accessibility is insufficient. click_visible_text has automatic accessibility retry and visual coordinate fallback. After UI actions, use the verification result before continuing. Before entering text, confirm the target field and intended text. Use get_foreground_app/wait_for_app when a task depends on a specific app. Use notification tools only when notification access is enabled. Use managed file paths or the selected-document URI for file operations. Never claim a tool action succeeded without its result.")
+            append("\nWhen a task is multi-step, use tools in sequence and inspect each result before continuing. For UI work, use inspect_screen/find_element first and prefer click_node or click_visible_text over blind coordinates. Use wait_for_element and scroll_until_visible when content is loading or off-screen. Use analyze_screen when accessibility is insufficient. click_visible_text has automatic accessibility retry and visual coordinate fallback. After UI actions, use the verification result before continuing. Before entering text, confirm the target field and intended text. Never claim a tool action succeeded without its result.")
         }
         conversation += AiChatMessage("system", system)
         _messages.value.dropLast(1).takeLast(16).filter { it.content.isNotBlank() }.forEach {
@@ -287,26 +287,9 @@ class AiAgentEngine(private val context: Context) {
         tool("open_url", "Open an http/https URL in the user's browser.", objectParams("url", "string")),
         tool("open_app", "Open an installed Android app by visible name.", objectParams("name", "string")),
         tool("list_apps", "List a concise set of installed launchable Android apps.", buildJsonObject { put("type", "object"); putJsonObject("properties") {} }),
-        tool("get_foreground_app", "Return the currently foreground Android app and activity.", emptyParams()),
-        tool("get_current_activity", "Return the current foreground Android activity.", emptyParams()),
-        tool("is_app_open", "Check whether a named Android app is currently foreground.", objectParams("name", "string")),
-        tool("wait_for_app", "Wait until a named Android app becomes foreground.", objectParams2(mapOf("name" to "string", "timeout_ms" to "integer"))),
         tool("set_flashlight", "Turn the phone flashlight on or off.", objectParams("on", "boolean")),
         tool("set_timer", "Set a phone timer in seconds.", objectParams("seconds", "integer")),
         tool("device_info", "Return basic non-sensitive device state such as battery, Android version and locale.", buildJsonObject { put("type", "object"); putJsonObject("properties") {} }),
-        tool("notification_status", "Check whether Dicio has notification-listener access.", emptyParams()),
-        tool("get_notifications", "List active Android notifications.", objectParams("limit", "integer")),
-        tool("open_notification", "Open an active Android notification by key or list index.", objectParams("key_or_index", "string")),
-        tool("dismiss_notification", "Dismiss an active Android notification by key or list index.", objectParams("key_or_index", "string")),
-        tool("list_files", "List files in Dicio managed files or cache storage.", objectParams("scope", "string")),
-        tool("file_info", "Inspect a Dicio managed file or selected document URI.", objectParams("path", "string")),
-        tool("read_file", "Read text from a Dicio managed file or selected content URI.", objectParams("path", "string")),
-        tool("read_selected_file", "Read the most recently selected document from the Android file picker.", emptyParams()),
-        tool("get_selected_file", "Return the most recently selected document URI and name.", emptyParams()),
-        tool("write_file", "Create or replace a UTF-8 text file in Dicio managed storage.", objectParams2(mapOf("path" to "string", "text" to "string"))),
-        tool("copy_file", "Copy a Dicio managed file to another managed path.", objectParams2(mapOf("source" to "string", "destination" to "string"))),
-        tool("move_file", "Move a Dicio managed file to another managed path.", objectParams2(mapOf("source" to "string", "destination" to "string"))),
-        tool("delete_file", "Delete a Dicio managed file or directory.", objectParams("path", "string")),
         tool("remember", "Save a useful user preference or fact for future conversations.", objectParams("text", "string")),
         tool("recall_memories", "Return saved user memories.", buildJsonObject { put("type", "object"); putJsonObject("properties") {} }),
         tool("forget_memory", "Delete one saved memory by its numeric id.", objectParams("id", "integer")),
@@ -365,29 +348,9 @@ class AiAgentEngine(private val context: Context) {
             "open_url" -> openUrl(args["url"]?.jsonPrimitive?.contentOrNull.orEmpty())
             "open_app" -> openApp(args["name"]?.jsonPrimitive?.contentOrNull.orEmpty())
             "list_apps" -> listApps()
-            "get_foreground_app" -> AiAppBridge.describe(context)
-            "get_current_activity" -> AiAppBridge.foreground(context)?.activityName?.ifBlank { "Unknown foreground activity." } ?: "No foreground activity is available."
-            "is_app_open" -> if (AiAppBridge.isAppOpen(context, args["name"]?.jsonPrimitive?.contentOrNull.orEmpty())) "App is foreground." else "App is not foreground."
-            "wait_for_app" -> waitForApp(
-                args["name"]?.jsonPrimitive?.contentOrNull.orEmpty(),
-                maxOf(250, args["timeout_ms"]?.jsonPrimitive?.intOrNull ?: 10_000).toLong()
-            )
             "set_flashlight" -> toggleFlashlight(args["on"]?.jsonPrimitive?.booleanOrNull == true)
             "set_timer" -> setTimer(maxOf(5, args["seconds"]?.jsonPrimitive?.intOrNull ?: 0))
             "device_info" -> deviceInfo()
-            "notification_status" -> AiNotificationBridge.status()
-            "get_notifications" -> AiNotificationBridge.listText(args["limit"]?.jsonPrimitive?.intOrNull ?: 30)
-            "open_notification" -> AiNotificationBridge.open(args["key_or_index"]?.jsonPrimitive?.contentOrNull.orEmpty())
-            "dismiss_notification" -> AiNotificationBridge.dismiss(args["key_or_index"]?.jsonPrimitive?.contentOrNull.orEmpty())
-            "list_files" -> AiFileBridge.listManaged(context, args["scope"]?.jsonPrimitive?.contentOrNull.orEmpty())
-            "file_info" -> AiFileBridge.info(context, args["path"]?.jsonPrimitive?.contentOrNull.orEmpty())
-            "read_file" -> AiFileBridge.read(context, args["path"]?.jsonPrimitive?.contentOrNull.orEmpty())
-            "read_selected_file" -> AiFileBridge.readLastSelected(context)
-            "get_selected_file" -> AiFileBridge.lastSelected(context)
-            "write_file" -> AiFileBridge.write(context, args["path"]?.jsonPrimitive?.contentOrNull.orEmpty(), args["text"]?.jsonPrimitive?.contentOrNull.orEmpty())
-            "copy_file" -> AiFileBridge.copy(context, args["source"]?.jsonPrimitive?.contentOrNull.orEmpty(), args["destination"]?.jsonPrimitive?.contentOrNull.orEmpty(), false)
-            "move_file" -> AiFileBridge.copy(context, args["source"]?.jsonPrimitive?.contentOrNull.orEmpty(), args["destination"]?.jsonPrimitive?.contentOrNull.orEmpty(), true)
-            "delete_file" -> AiFileBridge.delete(context, args["path"]?.jsonPrimitive?.contentOrNull.orEmpty())
             "remember" -> memory.remember(args["text"]?.jsonPrimitive?.contentOrNull.orEmpty()).let { "Remembered as memory #${it.id}." }
             "recall_memories" -> memory.list().joinToString("\n") { "#${it.id}: ${it.text}" }.ifBlank { "No memories saved." }
             "forget_memory" -> if (memory.forget(args["id"]?.jsonPrimitive?.longOrNull ?: -1L)) "Memory forgotten." else "No memory with that id."
@@ -532,19 +495,6 @@ Use the center coordinates of the target in the screenshot. If it is not visible
         }.getOrElse { "Could not update clipboard: ${it.message ?: "unknown error"}" }
     }
 
-    private suspend fun waitForApp(name: String, timeoutMs: Long): String {
-        if (name.isBlank()) return "App name was empty."
-        val timeout = timeoutMs.coerceIn(250L, 30_000L)
-        val deadline = android.os.SystemClock.uptimeMillis() + timeout
-        while (android.os.SystemClock.uptimeMillis() < deadline) {
-            if (AiAppBridge.isAppOpen(context, name)) {
-                return "App is foreground: ${AiAppBridge.describe(context)}"
-            }
-            kotlinx.coroutines.delay(250L)
-        }
-        return "Timed out waiting for app '$name'."
-    }
-
     private suspend fun analyzeScreen(instruction: String): String {
         val screenshot = AgentAccessibilityService.captureScreenDataUrl()
         if (!screenshot.startsWith("data:image/")) return screenshot
@@ -687,7 +637,7 @@ Do not invent capabilities that are not exposed as tools.
         """.trimIndent()
         const val MAX_AGENT_ROUNDS = 12
         const val MAX_SAVED_MESSAGES = 60
-        val CONFIRMATION_REQUIRED_TOOLS = setOf("send_message", "make_call", "purchase", "delete_file", "change_account", "tap_screen", "click_visible_text", "click_node", "input_text", "clear_text", "press_enter", "long_press", "swipe_screen", "clipboard_set", "dismiss_notification", "write_file", "copy_file", "move_file")
+        val CONFIRMATION_REQUIRED_TOOLS = setOf("send_message", "make_call", "purchase", "delete_file", "change_account", "tap_screen", "click_visible_text", "click_node", "input_text", "clear_text", "press_enter", "long_press", "swipe_screen", "clipboard_set")
     }
 }
 
