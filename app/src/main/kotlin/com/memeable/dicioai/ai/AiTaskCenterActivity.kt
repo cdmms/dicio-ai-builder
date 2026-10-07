@@ -15,9 +15,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -35,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -48,7 +51,7 @@ class AiTaskCenterActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         engine = AiAgentRuntime.get(applicationContext)
         setContent {
-            org.stypox.dicio.ui.theme.AppTheme {
+            AiAgentTheme {
                 AiTaskCenterScreen(
                     engine = engine,
                     onBack = { finish() }
@@ -71,7 +74,7 @@ private fun AiTaskCenterScreen(
     LaunchedEffect(Unit) {
         while (true) {
             tasks = engine.taskSnapshot()
-            delay(750L)
+            delay(1000L)
         }
     }
 
@@ -85,16 +88,19 @@ private fun AiTaskCenterScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
-                        Text("Agent Tasks", fontWeight = FontWeight.Bold)
-                        Text(
-                            "Current task and execution history",
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                    }
+                    Text(
+                        "Tasks",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("Back") }
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back"
+                        )
+                    }
                 }
             )
         }
@@ -112,15 +118,11 @@ private fun AiTaskCenterScreen(
                     .fillMaxSize()
                     .padding(padding),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(16.dp)
+                contentPadding = PaddingValues(18.dp)
             ) {
                 current?.let { task ->
                     item {
-                        Text(
-                            "CURRENT TASK",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        SectionLabel("Current task")
                     }
                     item {
                         TaskCard(
@@ -136,27 +138,12 @@ private fun AiTaskCenterScreen(
                 }
 
                 item {
-                    Text(
-                        "TASK HISTORY",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                    SectionLabel("History")
                 }
 
                 if (history.isEmpty()) {
                     item {
-                        Surface(
-                            tonalElevation = 1.dp,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = MaterialTheme.shapes.large
-                        ) {
-                            Text(
-                                "Completed, failed, cancelled, and waiting tasks will appear here.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.padding(16.dp)
-                            )
-                        }
+                        EmptyTaskState()
                     }
                 } else {
                     items(history, key = { it.id }) { task ->
@@ -164,21 +151,52 @@ private fun AiTaskCenterScreen(
                             task = task,
                             emphasized = false,
                             onOpen = { selectedId = task.id },
-                            onResume = if (task.status in setOf("RUNNING", "WAITING_CONFIRMATION")) {
+                            onResume = if (
+                                task.status in setOf("RUNNING", "WAITING_CONFIRMATION")
+                            ) {
                                 { engine.resumeTaskFromCenter(task.id) }
-                            } else null,
+                            } else {
+                                null
+                            },
                             onStop = null,
-                            onRetry = if (task.status !in setOf("RUNNING", "WAITING_CONFIRMATION")) {
+                            onRetry = if (
+                                task.status !in setOf("RUNNING", "WAITING_CONFIRMATION")
+                            ) {
                                 { engine.retryTaskFromCenter(task.id) }
-                            } else null,
-                            onDelete = if (task.status !in setOf("RUNNING", "WAITING_CONFIRMATION")) {
-                                { engine.deleteTaskFromCenter(task.id) }
-                            } else null
+                            } else {
+                                null
+                            },
+                            onDelete = null
                         )
                     }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        style = MaterialTheme.typography.titleSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(top = 4.dp)
+    )
+}
+
+@Composable
+private fun EmptyTaskState() {
+    Surface(
+        tonalElevation = 1.dp,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large
+    ) {
+        Text(
+            "Completed, failed, and cancelled tasks will appear here.",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(16.dp)
+        )
     }
 }
 
@@ -193,9 +211,9 @@ private fun TaskCard(
     onDelete: (() -> Unit)?
 ) {
     Surface(
-        tonalElevation = if (emphasized) 5.dp else 2.dp,
+        tonalElevation = if (emphasized) 4.dp else 1.dp,
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge
+        shape = MaterialTheme.shapes.large
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(modifier = Modifier.fillMaxWidth()) {
@@ -203,7 +221,7 @@ private fun TaskCard(
                     Text(
                         statusTitle(task.status),
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         task.request,
@@ -212,19 +230,14 @@ private fun TaskCard(
                         modifier = Modifier.padding(top = 5.dp)
                     )
                 }
-                Text(
-                    statusIcon(task.status),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
-                )
             }
 
             Spacer(Modifier.height(10.dp))
 
             val step = task.step.coerceAtLeast(1)
             Text(
-                "Step $step / ${AiAgentEngine.MAX_AGENT_ROUNDS} • ${task.timeline.size} timeline events",
-                style = MaterialTheme.typography.labelSmall
+                "Step $step of ${AiAgentEngine.MAX_AGENT_ROUNDS}",
+                style = MaterialTheme.typography.labelMedium
             )
             Spacer(Modifier.height(5.dp))
             LinearProgressIndicator(
@@ -238,6 +251,7 @@ private fun TaskCard(
                 Text(
                     "Last action: $it",
                     style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 6.dp)
                 )
             }
@@ -245,12 +259,15 @@ private fun TaskCard(
             Text(
                 formatTime(task.updatedAt),
                 style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
             )
 
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilledTonalButton(onClick = onOpen) { Text("Details") }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilledTonalButton(onClick = onOpen) {
+                    Text("Details")
+                }
                 onResume?.let { TextButton(onClick = it) { Text("Resume") } }
                 onStop?.let { TextButton(onClick = it) { Text("Stop") } }
                 onRetry?.let { TextButton(onClick = it) { Text("Retry") } }
@@ -267,25 +284,29 @@ private fun TaskDetailView(
     onBack: () -> Unit
 ) {
     val events = task.timeline.asReversed()
+
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
-        contentPadding = PaddingValues(16.dp)
+        contentPadding = PaddingValues(18.dp)
     ) {
         item {
-            TextButton(onClick = onBack) { Text("← Task list") }
+            TextButton(onClick = onBack) {
+                Text("← Task list")
+            }
         }
+
         item {
             Surface(
-                tonalElevation = 4.dp,
+                tonalElevation = 3.dp,
                 modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraLarge
+                shape = MaterialTheme.shapes.large
             ) {
                 Column(modifier = Modifier.padding(18.dp)) {
                     Text(
                         statusTitle(task.status),
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
                         task.request,
@@ -293,7 +314,7 @@ private fun TaskDetailView(
                         modifier = Modifier.padding(top = 8.dp)
                     )
                     Text(
-                        "Step ${task.step.coerceAtLeast(1)} / ${AiAgentEngine.MAX_AGENT_ROUNDS}",
+                        "Step ${task.step.coerceAtLeast(1)} of ${AiAgentEngine.MAX_AGENT_ROUNDS}",
                         style = MaterialTheme.typography.labelMedium,
                         modifier = Modifier.padding(top = 10.dp)
                     )
@@ -301,43 +322,47 @@ private fun TaskDetailView(
                         Text(
                             "Last action: $it",
                             style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 5.dp)
                         )
                     }
                     Text(
                         "Updated ${formatTime(task.updatedAt)}",
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
             }
         }
+
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (task.status in setOf("RUNNING", "WAITING_CONFIRMATION")) {
-                    FilledTonalButton(onClick = { engine.stopTaskFromCenter(task.id) }) {
+                    FilledTonalButton(
+                        onClick = { engine.stopTaskFromCenter(task.id) }
+                    ) {
                         Text("Stop")
                     }
-                    TextButton(onClick = { engine.resumeTaskFromCenter(task.id) }) {
+                    TextButton(
+                        onClick = { engine.resumeTaskFromCenter(task.id) }
+                    ) {
                         Text("Resume")
                     }
                 } else {
-                    FilledTonalButton(onClick = { engine.retryTaskFromCenter(task.id) }) {
+                    Button(
+                        onClick = { engine.retryTaskFromCenter(task.id) }
+                    ) {
                         Text("Retry")
-                    }
-                    TextButton(onClick = { engine.deleteTaskFromCenter(task.id) }) {
-                        Text("Delete")
                     }
                 }
             }
         }
+
         item {
-            Text(
-                "EXECUTION TIMELINE",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
-            )
+            SectionLabel("Execution timeline")
         }
+
         if (events.isEmpty()) {
             item {
                 Text(
@@ -358,20 +383,28 @@ private fun TimelineRow(event: AiTaskTimelineEntry) {
     Surface(
         tonalElevation = 1.dp,
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large
+        shape = MaterialTheme.shapes.medium
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(modifier = Modifier.fillMaxWidth()) {
                 Text(
                     statusIcon(event.status),
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = when (event.status) {
+                        "failed" -> MaterialTheme.colorScheme.error
+                        "completed", "approved" -> MaterialTheme.colorScheme.primary
+                        else -> MaterialTheme.colorScheme.onSurface
+                    }
                 )
-                Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .padding(start = 10.dp)
+                        .weight(1f)
+                ) {
                     Text(
                         "Step ${event.step} • ${event.tool}",
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.SemiBold
+                        style = MaterialTheme.typography.labelLarge
                     )
                     Text(
                         event.detail,
@@ -383,6 +416,7 @@ private fun TimelineRow(event: AiTaskTimelineEntry) {
             Text(
                 "${event.status} • ${formatTime(event.timestamp)}",
                 style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 26.dp, top = 6.dp)
             )
         }

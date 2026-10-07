@@ -1,8 +1,5 @@
 package com.memeable.dicioai.ai
-import kotlinx.coroutines.delay
 
-import android.content.Intent
-import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,7 +12,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -24,15 +21,18 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -49,11 +49,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.shape.CircleShape
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,33 +73,22 @@ fun AiAgentScreen(
     var input by rememberSaveable { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(false) }
     var showClear by remember { mutableStateOf(false) }
+    var showVoiceMenu by remember { mutableStateOf(false) }
     var persistedTasks by remember { mutableStateOf(engine.taskSnapshot()) }
-    var foregroundServiceRunning by remember { mutableStateOf(false) }
 
     val messages by engine.messages
-    val events by engine.events
     val busy by engine.busy
     val pending by engine.pendingConfirmation
     val listState = rememberLazyListState()
-    val context = LocalContext.current
 
     val providerReady = engine.apiKey.isNotBlank() ||
         engine.endpoint.contains("127.0.0.1", ignoreCase = true) ||
         engine.endpoint.contains("localhost", ignoreCase = true)
 
-    val currentTask = persistedTasks.firstOrNull {
-        it.status == "RUNNING"
-    }
-    val interruptedTask = persistedTasks.firstOrNull {
-        it.status == "RUNNING" || it.status == "WAITING_CONFIRMATION"
-    }
-    val latestEvent = events.lastOrNull()
-
     LaunchedEffect(Unit) {
         while (true) {
             persistedTasks = engine.taskSnapshot()
-            foregroundServiceRunning = AiAgentForegroundService.isRunning()
-            delay(750L)
+            delay(1000L)
         }
     }
 
@@ -109,24 +98,13 @@ fun AiAgentScreen(
         }
     }
 
+    val currentTask = persistedTasks.firstOrNull {
+        it.status == "RUNNING" || it.status == "WAITING_CONFIRMATION"
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            "Dicio AI",
-                            fontWeight = FontWeight.Bold
-                        )
-                        AgentStatusPill(
-                            providerReady = providerReady,
-                            busy = busy,
-                            pending = pending != null,
-                            serviceRunning = foregroundServiceRunning,
-                            voiceState = voiceState
-                        )
-                    }
-                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -135,17 +113,33 @@ fun AiAgentScreen(
                         )
                     }
                 },
-                actions = {
-                    TextButton(onClick = onTaskCenter) {
-                        Text("Tasks")
+                title = {
+                    Column {
+                        Text(
+                            "Dicio",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        AgentHeaderStatus(
+                            providerReady = providerReady,
+                            busy = busy,
+                            pending = pending != null,
+                            handsFree = handsFree,
+                            voiceState = voiceState
+                        )
                     }
-                    TextButton(onClick = onBack) {
-                        Text("Classic")
+                },
+                actions = {
+                    IconButton(onClick = onTaskCenter) {
+                        Icon(
+                            Icons.Default.List,
+                            contentDescription = "Tasks"
+                        )
                     }
                     IconButton(onClick = { showClear = true }) {
                         Icon(
                             Icons.Default.Delete,
-                            contentDescription = "Clear chat"
+                            contentDescription = "Clear conversation"
                         )
                     }
                     IconButton(onClick = { showSettings = true }) {
@@ -169,124 +163,88 @@ fun AiAgentScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
                 contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 12.dp,
-                    bottom = 12.dp
+                    start = 18.dp,
+                    end = 18.dp,
+                    top = 18.dp,
+                    bottom = 14.dp
                 )
             ) {
                 if (messages.isEmpty()) {
                     item {
-                        AgentWelcomeCard(
+                        AgentWelcome(
                             providerReady = providerReady,
                             onSetup = { showSettings = true }
                         )
                     }
+                }
 
+                if (currentTask != null) {
                     item {
-                        VoiceControlCard(
-                            voiceState = voiceState,
-                            partialText = voicePartialText,
-                            handsFree = handsFree,
-                            speakReplies = speakReplies,
-                            onVoice = onVoice,
-                            onStopVoice = onStopVoice,
-                            onToggleHandsFree = onToggleHandsFree,
-                            onToggleSpeech = onToggleSpeech
-                        )
-                    }
-
-                    item {
-                        QuickActionsCard(
-                            enabled = !busy && providerReady,
-                            onReadScreen = {
-                                engine.enqueue(
-                                    "Read my screen and tell me what is currently visible."
-                                )
-                            },
-                            onOpenSettings = {
-                                context.startActivity(Intent(Settings.ACTION_SETTINGS))
-                            }
-                        )
-                    }
-                } else {
-                    item {
-                        LiveTaskCard(
-                            providerReady = providerReady,
-                            busy = busy,
+                        AgentTaskBar(
                             task = currentTask,
-                            pending = pending,
-                            latestEvent = latestEvent,
-                            serviceRunning = foregroundServiceRunning,
-                            onSetup = { showSettings = true },
+                            busy = busy,
+                            pending = pending != null,
                             onStop = { engine.cancelCurrentTask() }
                         )
                     }
                 }
 
-                if (messages.isNotEmpty() && (voiceState != AiVoiceState.IDLE || handsFree)) {
+                if (voiceState != AiVoiceState.IDLE || handsFree) {
                     item {
-                        VoiceControlCard(
+                        VoiceStatusBar(
                             voiceState = voiceState,
                             partialText = voicePartialText,
                             handsFree = handsFree,
                             speakReplies = speakReplies,
-                            onVoice = onVoice,
-                            onStopVoice = onStopVoice,
-                            onToggleHandsFree = onToggleHandsFree,
-                            onToggleSpeech = onToggleSpeech
+                            onStop = onStopVoice
                         )
                     }
                 }
 
-                if (!providerReady) {
+                if (!providerReady && messages.isNotEmpty()) {
                     item {
-                        SetupCard(
-                            onConfigure = { showSettings = true },
+                        SetupInlineCard(
+                            onSetup = { showSettings = true },
                             onAccessibility = { engine.openAccessibilitySettings() }
                         )
                     }
                 }
 
-                interruptedTask?.let { task ->
-                    if (!busy) {
-                        item {
-                            RecoveryCard(
-                                task = task,
-                                onResume = { engine.resumeLastInterruptedTask() }
-                            )
-                        }
-                    }
-                }
-
-                if (events.isNotEmpty() && busy) {
-                    item {
-                        CompactActivityCard(events = events)
-                    }
-                }
-
                 items(
-                    messages,
+                    items = messages,
                     key = { it.id }
                 ) { message ->
                     MessageBubble(message)
                 }
             }
 
-            AgentInputBar(
+            AgentComposer(
                 input = input,
                 busy = busy,
                 voiceState = voiceState,
                 handsFree = handsFree,
                 speakReplies = speakReplies,
+                showVoiceMenu = showVoiceMenu,
                 onInputChanged = { input = it },
                 onVoice = {
-                    if (voiceState == AiVoiceState.LISTENING) onStopVoice() else onVoice()
+                    if (voiceState == AiVoiceState.LISTENING) {
+                        onStopVoice()
+                    } else {
+                        onVoice()
+                    }
                 },
-                onToggleHandsFree = onToggleHandsFree,
-                onToggleSpeech = onToggleSpeech,
+                onToggleVoiceMenu = { showVoiceMenu = !showVoiceMenu },
+                onDismissVoiceMenu = { showVoiceMenu = false },
+                onToggleHandsFree = {
+                    showVoiceMenu = false
+                    onToggleHandsFree()
+                },
+                onToggleSpeech = {
+                    showVoiceMenu = false
+                    onToggleSpeech()
+                },
                 onSend = {
                     val text = input.trim()
                     if (text.isNotBlank()) {
@@ -301,15 +259,19 @@ fun AiAgentScreen(
     pending?.let { confirmation ->
         AlertDialog(
             onDismissRequest = { engine.confirmPending(false) },
-            title = { Text("Approval needed") },
+            title = {
+                Text("Approval needed")
+            },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "Dicio AI paused the task before a consequential action."
+                        "Dicio paused before a consequential action.",
+                        style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
                         confirmation.summary,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Medium
                     )
                 }
             },
@@ -336,10 +298,13 @@ fun AiAgentScreen(
     if (showClear) {
         AlertDialog(
             onDismissRequest = { showClear = false },
-            title = { Text("Clear conversation?") },
+            title = {
+                Text("Clear conversation?")
+            },
             text = {
                 Text(
-                    "This removes the saved Dicio AI chat history on this phone."
+                    "This removes the saved Dicio chat history on this phone.",
+                    style = MaterialTheme.typography.bodyMedium
                 )
             },
             confirmButton = {
@@ -362,74 +327,133 @@ fun AiAgentScreen(
 }
 
 @Composable
-private fun AgentStatusPill(
+private fun AgentHeaderStatus(
     providerReady: Boolean,
     busy: Boolean,
     pending: Boolean,
-    serviceRunning: Boolean,
+    handsFree: Boolean,
     voiceState: AiVoiceState
 ) {
-    val label = when {
-        voiceState == AiVoiceState.LISTENING -> "listening"
-        voiceState == AiVoiceState.PROCESSING -> "processing voice"
-        voiceState == AiVoiceState.SPEAKING -> "speaking"
-        voiceState == AiVoiceState.ERROR -> "voice issue"
-        pending -> "needs approval"
-        busy && serviceRunning -> "working in background"
-        busy -> "working"
-        providerReady -> "online"
-        else -> "setup needed"
+    val status = when {
+        pending -> "Needs approval"
+        voiceState == AiVoiceState.LISTENING -> "Listening"
+        voiceState == AiVoiceState.PROCESSING -> "Processing voice"
+        voiceState == AiVoiceState.SPEAKING -> "Speaking"
+        voiceState == AiVoiceState.ERROR -> "Voice issue"
+        busy -> if (handsFree) "Working • hands-free" else "Working"
+        providerReady -> "Ready"
+        else -> "Setup needed"
     }
 
     Text(
-        label,
+        status,
         style = MaterialTheme.typography.labelSmall,
-        fontWeight = FontWeight.SemiBold
+        color = MaterialTheme.colorScheme.onSurfaceVariant
     )
 }
 
 @Composable
-private fun LiveTaskCard(
+private fun AgentWelcome(
     providerReady: Boolean,
+    onSetup: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 56.dp, bottom = 26.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Surface(
+            modifier = Modifier.size(72.dp),
+            shape = CircleShape,
+            tonalElevation = 2.dp,
+            color = MaterialTheme.colorScheme.primaryContainer
+        ) {
+            Box(
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "✦",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Text(
+            "What can I do for you?",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.SemiBold
+        )
+
+        Spacer(Modifier.height(10.dp))
+
+        Text(
+            "Give Dicio a goal. It can answer, search, operate apps, read your screen, and complete multi-step tasks.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth(0.9f)
+        )
+
+        if (!providerReady) {
+            Spacer(Modifier.height(18.dp))
+
+            Text(
+                "Connect an AI provider to start.",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            Button(onClick = onSetup) {
+                Text("Open settings")
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgentTaskBar(
+    task: AiTaskCheckpoint,
     busy: Boolean,
-    task: AiTaskCheckpoint?,
-    pending: PendingConfirmation?,
-    latestEvent: AiAgentEvent?,
-    serviceRunning: Boolean,
-    onSetup: () -> Unit,
+    pending: Boolean,
     onStop: () -> Unit
 ) {
     Surface(
-        tonalElevation = if (busy) 4.dp else 2.dp,
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge
+        shape = MaterialTheme.shapes.large,
+        tonalElevation = if (pending) 4.dp else 2.dp,
+        color = if (pending) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        }
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        when {
-                            pending != null -> "Approval needed"
-                            busy -> "Agent is working"
-                            providerReady -> "Agent ready"
-                            else -> "Finish setup"
-                        },
+                        if (pending) "Needs your approval"
+                        else if (busy) "Working on it"
+                        else "Task",
                         style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        when {
-                            pending != null -> "Task paused until you approve the next action."
-                            busy && serviceRunning -> "Running in the background."
-                            busy -> "Watching the task and verifying actions."
-                            providerReady -> "Ready for your next task."
-                            else -> "Connect an AI provider to start."
-                        },
+                        task.request,
                         style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 3.dp)
+                        maxLines = 2,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -437,288 +461,108 @@ private fun LiveTaskCard(
                     TextButton(onClick = onStop) {
                         Text("Stop")
                     }
-                } else if (!providerReady) {
-                    TextButton(onClick = onSetup) {
-                        Text("Setup")
-                    }
                 }
             }
 
-            task?.let {
-                Spacer(Modifier.height(12.dp))
-
-                Text(
-                    it.request,
-                    maxLines = 2,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(Modifier.height(10.dp))
-
-                val step = it.step.coerceAtLeast(1)
-                Text(
-                    "Step $step / ${AiAgentEngine.MAX_AGENT_ROUNDS}",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(Modifier.height(6.dp))
-
-                androidx.compose.material3.LinearProgressIndicator(
-                    progress = {
-                        (step.toFloat() / AiAgentEngine.MAX_AGENT_ROUNDS)
-                            .coerceIn(0f, 1f)
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                it.lastTool?.takeIf { value -> value.isNotBlank() }?.let { tool ->
-                    Text(
-                        "Last action: $tool",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
-                }
-            }
-
-            latestEvent?.let { event ->
-                Spacer(Modifier.height(8.dp))
-                Surface(
-                    tonalElevation = 1.dp,
-                    shape = MaterialTheme.shapes.medium,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            statusIcon(event.status),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Column(
-                            modifier = Modifier.padding(start = 8.dp)
-                        ) {
-                            Text(
-                                event.tool,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                event.detail,
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 2
-                            )
-                        }
-                    }
-                }
-            }
+            val step = task.step.coerceAtLeast(1)
+            Text(
+                "Step $step of ${AiAgentEngine.MAX_AGENT_ROUNDS}",
+                style = MaterialTheme.typography.labelMedium
+            )
+            LinearProgressIndicator(
+                progress = {
+                    (step.toFloat() / AiAgentEngine.MAX_AGENT_ROUNDS)
+                        .coerceIn(0f, 1f)
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
 
 @Composable
-private fun RecoveryCard(
-    task: AiTaskCheckpoint,
-    onResume: () -> Unit
+private fun VoiceStatusBar(
+    voiceState: AiVoiceState,
+    partialText: String,
+    handsFree: Boolean,
+    speakReplies: Boolean,
+    onStop: () -> Unit
 ) {
     Surface(
-        tonalElevation = 3.dp,
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge
+        shape = MaterialTheme.shapes.large,
+        tonalElevation = if (voiceState == AiVoiceState.LISTENING) 3.dp else 1.dp
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.padding(
+                start = 14.dp,
+                top = 12.dp,
+                end = 8.dp,
+                bottom = 12.dp
+            ),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Icon(
+                imageVector = when (voiceState) {
+                    AiVoiceState.LISTENING -> Icons.Default.Mic
+                    else -> Icons.Default.MicOff
+                },
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+
+            Column(
+                modifier = Modifier
+                    .padding(start = 12.dp)
+                    .weight(1f)
+            ) {
                 Text(
-                    if (task.status == "WAITING_CONFIRMATION") {
-                        "Waiting for approval"
-                    } else {
-                        "Resume your task"
+                    when (voiceState) {
+                        AiVoiceState.LISTENING -> "Listening"
+                        AiVoiceState.PROCESSING -> "Processing"
+                        AiVoiceState.SPEAKING -> "Speaking"
+                        AiVoiceState.ERROR -> "Voice needs attention"
+                        AiVoiceState.IDLE -> "Voice mode"
                     },
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    task.request,
-                    maxLines = 2,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                Text(
-                    "Step ${task.step.coerceAtLeast(1)} / ${AiAgentEngine.MAX_AGENT_ROUNDS}" +
-                        (task.lastTool?.let { " • $it" } ?: ""),
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-            }
-
-            TextButton(onClick = onResume) {
-                Text("Resume")
-            }
-        }
-    }
-}
-
-@Composable
-private fun CompactActivityCard(
-    events: List<AiAgentEvent>
-) {
-    Surface(
-        tonalElevation = 2.dp,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    "Live activity",
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    "LIVE",
-                    style = MaterialTheme.typography.labelSmall,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(Modifier.height(6.dp))
-
-            events.takeLast(3).forEach { event ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 2.dp),
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Text(
-                        statusIcon(event.status),
-                        modifier = Modifier.widthIn(min = 18.dp),
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        "${event.tool}: ${event.detail}",
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 2
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AgentWelcomeCard(
-    providerReady: Boolean,
-    onSetup: () -> Unit
-) {
-    Surface(
-        tonalElevation = 4.dp,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.extraLarge
-    ) {
-        Column(modifier = Modifier.padding(22.dp)) {
-            Surface(
-                tonalElevation = 2.dp,
-                shape = MaterialTheme.shapes.large
-            ) {
-                Box(
-                    modifier = Modifier
-                        .size(64.dp)
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "✦",
-                        fontSize = 34.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(18.dp))
-
-            Text(
-                "Your Android AI agent",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(Modifier.height(8.dp))
-
-            Text(
-                "Ask Dicio to use your phone for you — search, open apps, read " +
-                    "the screen, tap, type, remember things, manage files, and " +
-                    "complete multi-step tasks.",
-                style = MaterialTheme.typography.bodyLarge
-            )
-
-            Spacer(Modifier.height(16.dp))
-
-            Surface(
-                tonalElevation = 1.dp,
-                shape = MaterialTheme.shapes.medium
-            ) {
-                Text(
-                    if (providerReady) "●  online" else "○  setup needed",
-                    modifier = Modifier.padding(
-                        horizontal = 12.dp,
-                        vertical = 8.dp
-                    ),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold
                 )
-            }
 
-            if (!providerReady) {
-                Spacer(Modifier.height(14.dp))
-                Button(onClick = onSetup) {
-                    Text("Finish setup")
+                val detail = when (voiceState) {
+                    AiVoiceState.LISTENING -> partialText.ifBlank { "Say what you want done." }
+                    AiVoiceState.PROCESSING -> "Turning your request into an agent task."
+                    AiVoiceState.SPEAKING -> "Reading the latest response."
+                    AiVoiceState.ERROR -> "Tap the microphone to try again."
+                    AiVoiceState.IDLE -> "Voice mode is ready."
+                }
+
+                Text(
+                    detail,
+                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 2,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                if (voiceState == AiVoiceState.IDLE && (handsFree || speakReplies)) {
+                    Text(
+                        buildString {
+                            if (handsFree) append("Hands-free")
+                            if (handsFree && speakReplies) append(" • ")
+                            if (speakReplies) append("Replies spoken")
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(top = 3.dp)
+                    )
                 }
             }
-        }
-    }
-}
 
-@Composable
-private fun QuickActionsCard(
-    enabled: Boolean,
-    onReadScreen: () -> Unit,
-    onOpenSettings: () -> Unit
-) {
-    Surface(
-        tonalElevation = 2.dp,
-        modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Text("Quick actions", fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            if (
+                voiceState == AiVoiceState.LISTENING ||
+                voiceState == AiVoiceState.SPEAKING
             ) {
-                FilledTonalButton(
-                    onClick = onReadScreen,
-                    enabled = enabled,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Read my screen")
-                }
-                FilledTonalButton(
-                    onClick = onOpenSettings,
-                    enabled = enabled,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Open Settings")
+                TextButton(onClick = onStop) {
+                    Text("Stop")
                 }
             }
         }
@@ -726,30 +570,35 @@ private fun QuickActionsCard(
 }
 
 @Composable
-private fun SetupCard(
-    onConfigure: () -> Unit,
+private fun SetupInlineCard(
+    onSetup: () -> Unit,
     onAccessibility: () -> Unit
 ) {
     Surface(
-        tonalElevation = 1.dp,
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large
+        shape = MaterialTheme.shapes.large,
+        tonalElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text("Phone-control setup", fontWeight = FontWeight.Bold)
             Text(
-                "Enable Accessibility so Dicio can inspect and interact with other apps.",
+                "Phone control isn't enabled",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "Enable Accessibility if you want Dicio to interact with other apps.",
                 style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 4.dp)
             )
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(top = 10.dp)
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(top = 8.dp)
             ) {
-                FilledTonalButton(onClick = onAccessibility) {
+                TextButton(onClick = onAccessibility) {
                     Text("Enable control")
                 }
-                TextButton(onClick = onConfigure) {
+                TextButton(onClick = onSetup) {
                     Text("Provider settings")
                 }
             }
@@ -758,186 +607,178 @@ private fun SetupCard(
 }
 
 @Composable
-private fun AgentInputBar(
+private fun AgentComposer(
     input: String,
     busy: Boolean,
     voiceState: AiVoiceState,
     handsFree: Boolean,
     speakReplies: Boolean,
+    showVoiceMenu: Boolean,
     onInputChanged: (String) -> Unit,
     onVoice: () -> Unit,
+    onToggleVoiceMenu: () -> Unit,
+    onDismissVoiceMenu: () -> Unit,
     onToggleHandsFree: () -> Unit,
     onToggleSpeech: () -> Unit,
     onSend: () -> Unit
 ) {
     Surface(
-        tonalElevation = 5.dp,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                IconButton(onClick = onVoice, enabled = !busy) {
-                    Icon(
-                        if (voiceState == AiVoiceState.LISTENING) Icons.Default.MicOff else Icons.Default.Mic,
-                        contentDescription = if (voiceState == AiVoiceState.LISTENING) "Stop listening" else "Start voice input"
-                    )
-                }
-
-                OutlinedTextField(
-                    value = input,
-                    onValueChange = onInputChanged,
-                    modifier = Modifier.weight(1f).fillMaxWidth(),
-                    placeholder = {
-                        Text(
-                            when (voiceState) {
-                                AiVoiceState.LISTENING -> "Listening…"
-                                AiVoiceState.SPEAKING -> "Dicio is speaking…"
-                                else -> "Ask Dicio to do something…"
-                            }
-                        )
-                    },
-                    maxLines = 5,
-                    enabled = !busy
-                )
-
-                IconButton(onClick = onSend, enabled = !busy && input.isNotBlank()) {
-                    Icon(Icons.Default.Send, contentDescription = "Send")
-                }
-            }
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 14.dp, end = 14.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(onClick = onToggleHandsFree) {
-                    Text(if (handsFree) "Hands-free on" else "Hands-free")
-                }
-                TextButton(onClick = onToggleSpeech) {
-                    Text(if (speakReplies) "Speak replies on" else "Speak replies")
-                }
-                if (voiceState == AiVoiceState.LISTENING) {
-                    Text(
-                        "Listening…",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 4.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun VoiceControlCard(
-    voiceState: AiVoiceState,
-    partialText: String,
-    handsFree: Boolean,
-    speakReplies: Boolean,
-    onVoice: () -> Unit,
-    onStopVoice: () -> Unit,
-    onToggleHandsFree: () -> Unit,
-    onToggleSpeech: () -> Unit
-) {
-    Surface(
-        tonalElevation = if (voiceState == AiVoiceState.LISTENING || voiceState == AiVoiceState.SPEAKING) 5.dp else 3.dp,
         modifier = Modifier.fillMaxWidth(),
+        tonalElevation = 4.dp,
         shape = MaterialTheme.shapes.extraLarge
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            verticalAlignment = Alignment.Bottom
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(tonalElevation = 2.dp, shape = MaterialTheme.shapes.large) {
-                    IconButton(
-                        onClick = {
-                            if (voiceState == AiVoiceState.LISTENING || voiceState == AiVoiceState.SPEAKING) onStopVoice()
-                            else onVoice()
-                        },
-                        modifier = Modifier.size(56.dp)
-                    ) {
-                        Icon(
-                            if (voiceState == AiVoiceState.LISTENING) Icons.Default.MicOff else Icons.Default.Mic,
-                            contentDescription = "Voice control"
-                        )
+            IconButton(
+                onClick = onVoice,
+                enabled = !busy
+            ) {
+                Icon(
+                    imageVector = if (voiceState == AiVoiceState.LISTENING) {
+                        Icons.Default.MicOff
+                    } else {
+                        Icons.Default.Mic
+                    },
+                    contentDescription = if (voiceState == AiVoiceState.LISTENING) {
+                        "Stop listening"
+                    } else {
+                        "Start voice input"
+                    }
+                )
+            }
+
+            OutlinedTextField(
+                value = input,
+                onValueChange = onInputChanged,
+                modifier = Modifier.weight(1f),
+                placeholder = {
+                    Text(
+                        when (voiceState) {
+                            AiVoiceState.LISTENING -> "Listening…"
+                            AiVoiceState.SPEAKING -> "Dicio is speaking…"
+                            else -> "Ask Dicio to do something"
+                        }
+                    )
+                },
+                minLines = 1,
+                maxLines = 5,
+                enabled = !busy,
+                shape = MaterialTheme.shapes.extraLarge,
+                trailingIcon = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box {
+                            IconButton(onClick = onToggleVoiceMenu) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    contentDescription = "Voice options"
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = showVoiceMenu,
+                                onDismissRequest = onDismissVoiceMenu
+                            ) {
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (handsFree) {
+                                                "Hands-free: on"
+                                            } else {
+                                                "Hands-free: off"
+                                            }
+                                        ),
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.Mic,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = onToggleHandsFree
+                                    )
+                                )
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (speakReplies) {
+                                                "Speak replies: on"
+                                            } else {
+                                                "Speak replies: off"
+                                            }
+                                        ),
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Default.MicOff,
+                                                contentDescription = null
+                                            )
+                                        },
+                                        onClick = onToggleSpeech
+                                    )
+                                )
+                            }
+                        }
+
+                        IconButton(
+                            onClick = onSend,
+                            enabled = !busy && input.isNotBlank()
+                        ) {
+                            Icon(
+                                Icons.Default.Send,
+                                contentDescription = "Send"
+                            )
+                        }
                     }
                 }
-
-                Column(modifier = Modifier.padding(start = 12.dp)) {
-                    Text(
-                        when (voiceState) {
-                            AiVoiceState.LISTENING -> "Listening"
-                            AiVoiceState.PROCESSING -> "Processing"
-                            AiVoiceState.SPEAKING -> "Speaking"
-                            AiVoiceState.ERROR -> "Voice needs attention"
-                            AiVoiceState.IDLE -> if (handsFree) "Hands-free ready" else "Talk to Dicio"
-                        },
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        when (voiceState) {
-                            AiVoiceState.LISTENING -> if (partialText.isBlank()) "Tell me what you want done." else partialText
-                            AiVoiceState.PROCESSING -> "Turning your request into an agent task…"
-                            AiVoiceState.SPEAKING -> "Dicio is reading the latest response."
-                            AiVoiceState.ERROR -> "Tap the microphone to try again."
-                            AiVoiceState.IDLE -> if (handsFree) "I’ll listen again after each response." else "Speak a task instead of typing it."
-                        },
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onToggleHandsFree) {
-                    Text(if (handsFree) "Turn hands-free off" else "Turn hands-free on")
-                }
-                TextButton(onClick = onToggleSpeech) {
-                    Text(if (speakReplies) "Mute replies" else "Speak replies")
-                }
-            }
+            )
         }
     }
-}
-
-private fun statusIcon(status: String) = when (status) {
-    "completed" -> "✓"
-    "requested" -> "→"
-    "approved" -> "✓"
-    "recovery" -> "↻"
-    else -> "•"
 }
 
 @Composable
 private fun MessageBubble(message: AiUiMessage) {
     val isUser = message.role == "user"
+
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+        horizontalArrangement = if (isUser) {
+            Arrangement.End
+        } else {
+            Arrangement.Start
+        }
     ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(0.88f),
-            tonalElevation = if (isUser) 1.dp else 3.dp,
-            shape = MaterialTheme.shapes.large
-        ) {
-            Column(Modifier.padding(12.dp)) {
+        if (isUser) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(0.82f),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                shape = MaterialTheme.shapes.large
+            ) {
                 Text(
-                    if (isUser) "You" else "Dicio AI",
+                    message.content,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(
+                        horizontal = 15.dp,
+                        vertical = 12.dp
+                    )
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxWidth(0.92f)
+            ) {
+                Text(
+                    "Dicio",
                     style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.Bold
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.SemiBold
                 )
                 Text(
                     message.content,
-                    modifier = Modifier.padding(top = 4.dp),
-                    style = MaterialTheme.typography.bodyLarge
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(top = 4.dp)
                 )
             }
         }
@@ -952,31 +793,29 @@ private fun AiSettingsDialog(
     var endpoint by remember(engine.configRevision) {
         mutableStateOf(engine.endpoint)
     }
-
     var model by remember(engine.configRevision) {
         mutableStateOf(engine.model)
     }
-
     var apiKey by remember(engine.configRevision) {
         mutableStateOf(engine.apiKey)
     }
-
     var systemPrompt by remember(engine.configRevision) {
         mutableStateOf(engine.systemPrompt)
     }
+    var showAdvanced by rememberSaveable { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text("AI provider")
+            Text("AI settings")
         },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    "OpenRouter free router or any OpenAI-compatible endpoint. " +
-                        "UI control uses Android Accessibility."
+                    "Connect an OpenAI-compatible provider. Your API key is encrypted on this device.",
+                    style = MaterialTheme.typography.bodyMedium
                 )
 
                 OutlinedTextField(
@@ -996,26 +835,38 @@ private fun AiSettingsDialog(
                 OutlinedTextField(
                     value = apiKey,
                     onValueChange = { apiKey = it },
-                    label = {
-                        Text("API key (encrypted on device)")
-                    },
+                    label = { Text("API key") },
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation()
                 )
 
-                OutlinedTextField(
-                    value = systemPrompt,
-                    onValueChange = { systemPrompt = it },
-                    label = { Text("Agent instructions") },
-                    minLines = 4
-                )
+                TextButton(
+                    onClick = { showAdvanced = !showAdvanced }
+                ) {
+                    Text(
+                        if (showAdvanced) {
+                            "Hide advanced"
+                        } else {
+                            "Advanced"
+                        }
+                    )
+                }
+
+                if (showAdvanced) {
+                    OutlinedTextField(
+                        value = systemPrompt,
+                        onValueChange = { systemPrompt = it },
+                        label = { Text("Agent instructions") },
+                        minLines = 4
+                    )
+                }
 
                 TextButton(
                     onClick = {
                         engine.openAccessibilitySettings()
                     }
                 ) {
-                    Text("Enable phone-control agent")
+                    Text("Enable phone control")
                 }
             }
         },

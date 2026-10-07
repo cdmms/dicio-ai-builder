@@ -11,12 +11,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import org.stypox.dicio.ui.theme.AppTheme
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 
 class AiAgentActivity : ComponentActivity() {
     private lateinit var engine: AiAgentEngine
@@ -50,7 +48,7 @@ class AiAgentActivity : ComponentActivity() {
         val scheduledRequest = intent?.getStringExtra(EXTRA_RUN_TASK)
 
         setContent {
-            AppTheme {
+            AiAgentTheme {
                 val agent = remember { engine }
                 val voiceState by voiceController.state
                 val voicePartial by voiceController.partialText
@@ -61,7 +59,7 @@ class AiAgentActivity : ComponentActivity() {
 
                 val initialMessageId = remember { messages.lastOrNull()?.id }
                 var lastSpokenMessageId by rememberSaveable {
-                    androidx.compose.runtime.mutableStateOf(initialMessageId)
+                    mutableStateOf(initialMessageId)
                 }
 
                 LaunchedEffect(Unit) {
@@ -138,7 +136,8 @@ class AiAgentActivity : ComponentActivity() {
     }
 
     private fun requestOrStartListening() {
-        if (androidx.core.content.ContextCompat.checkSelfPermission(
+        if (
+            androidx.core.content.ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.RECORD_AUDIO
             ) != PackageManager.PERMISSION_GRANTED
@@ -165,16 +164,19 @@ class AiAgentActivity : ComponentActivity() {
     }
 
     private fun continueHandsFreeIfNeeded() {
-        mainHandler.postDelayed({
-            if (
-                !isFinishing &&
-                !isDestroyed &&
-                voiceController.handsFreeEnabled.value &&
-                voiceController.state.value == AiVoiceState.IDLE
-            ) {
-                requestOrStartListening()
-            }
-        }, 350L)
+        mainHandler.postDelayed(
+            {
+                if (
+                    !isFinishing &&
+                    !isDestroyed &&
+                    voiceController.handsFreeEnabled.value &&
+                    voiceController.state.value == AiVoiceState.IDLE
+                ) {
+                    requestOrStartListening()
+                }
+            },
+            350L
+        )
     }
 
     override fun onDestroy() {
