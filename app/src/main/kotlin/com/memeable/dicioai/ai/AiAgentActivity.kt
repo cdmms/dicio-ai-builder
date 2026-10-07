@@ -35,7 +35,14 @@ class AiAgentActivity : ComponentActivity() {
                 val agent = remember { engine }
                 LaunchedEffect(autoListen) { if (autoListen) launchVoiceInput() }
                 LaunchedEffect(scheduledRequest) { if (!scheduledRequest.isNullOrBlank()) engine.enqueue(scheduledRequest) }
-                AiAgentScreen(engine = agent, onBack = { finish() }, onVoice = { launchVoiceInput() })
+                AiAgentScreen(
+                    engine = agent,
+                    onBack = {
+                        startActivity(Intent(this@AiAgentActivity, org.stypox.dicio.MainActivity::class.java))
+                        finish()
+                    },
+                    onVoice = { launchVoiceInput() }
+                )
             }
         }
     }
