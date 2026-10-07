@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -690,8 +689,9 @@ private fun AgentComposer(
                                             } else {
                                                 "Hands-free: off"
                                             }
-                                        ),
-                                        leadingIcon = {
+                                        )
+                                    },
+                                    leadingIcon = {
                                             Icon(
                                                 Icons.Default.Mic,
                                                 contentDescription = null
@@ -708,8 +708,9 @@ private fun AgentComposer(
                                             } else {
                                                 "Speak replies: off"
                                             }
-                                        ),
-                                        leadingIcon = {
+                                        )
+                                    },
+                                    leadingIcon = {
                                             Icon(
                                                 Icons.Default.MicOff,
                                                 contentDescription = null
