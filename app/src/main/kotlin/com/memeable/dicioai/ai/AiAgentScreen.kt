@@ -699,7 +699,6 @@ private fun AgentComposer(
                                         },
                                         onClick = onToggleHandsFree
                                     )
-                                )
                                 DropdownMenuItem(
                                     text = {
                                         Text(
@@ -718,7 +717,6 @@ private fun AgentComposer(
                                         },
                                         onClick = onToggleSpeech
                                     )
-                                )
                             }
                         }
 
