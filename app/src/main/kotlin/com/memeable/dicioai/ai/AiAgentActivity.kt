@@ -12,7 +12,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveable
 import org.stypox.dicio.ui.theme.AppTheme
 
 class AiAgentActivity : ComponentActivity() {
@@ -65,7 +65,7 @@ class AiAgentActivity : ComponentActivity() {
                     if (autoListen) {
                         voiceController.setHandsFreeEnabled(true)
                         requestOrStartListening()
-                    } else if (voiceController.handsFreeEnabled) {
+                    } else if (voiceController.handsFreeEnabled.value) {
                         requestOrStartListening()
                     }
                 }
@@ -80,7 +80,7 @@ class AiAgentActivity : ComponentActivity() {
                     val last = messages.lastOrNull()
                     if (last?.role == "assistant" && last.id != lastSpokenMessageId) {
                         lastSpokenMessageId = last.id
-                        if (voiceController.speakRepliesEnabled) {
+                        if (voiceController.speakRepliesEnabled.value) {
                             voiceController.speak(last.content)
                         } else {
                             continueHandsFreeIfNeeded()
@@ -90,7 +90,7 @@ class AiAgentActivity : ComponentActivity() {
 
                 LaunchedEffect(pending?.summary) {
                     val current = pending ?: return@LaunchedEffect
-                    if (voiceController.speakRepliesEnabled) {
+                    if (voiceController.speakRepliesEnabled.value) {
                         voiceController.speak("I need your approval. ${current.summary}")
                     } else {
                         continueHandsFreeIfNeeded()
@@ -166,7 +166,7 @@ class AiAgentActivity : ComponentActivity() {
             if (
                 !isFinishing &&
                 !isDestroyed &&
-                voiceController.handsFreeEnabled &&
+                voiceController.handsFreeEnabled.value &&
                 voiceController.state.value == AiVoiceState.IDLE
             ) {
                 requestOrStartListening()
