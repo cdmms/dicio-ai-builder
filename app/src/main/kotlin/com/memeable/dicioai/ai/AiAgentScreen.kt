@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -60,7 +61,14 @@ fun AiAgentScreen(
     engine: AiAgentEngine,
     onBack: () -> Unit,
     onVoice: () -> Unit,
-    onTaskCenter: () -> Unit
+    onStopVoice: () -> Unit,
+    onTaskCenter: () -> Unit,
+    voiceState: AiVoiceState,
+    voicePartialText: String,
+    handsFree: Boolean,
+    speakReplies: Boolean,
+    onToggleHandsFree: () -> Unit,
+    onToggleSpeech: () -> Unit
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(false) }
@@ -114,7 +122,8 @@ fun AiAgentScreen(
                             providerReady = providerReady,
                             busy = busy,
                             pending = pending != null,
-                            serviceRunning = foregroundServiceRunning
+                            serviceRunning = foregroundServiceRunning,
+                            voiceState = voiceState
                         )
                     }
                 },
@@ -177,6 +186,19 @@ fun AiAgentScreen(
                     }
 
                     item {
+                        VoiceControlCard(
+                            voiceState = voiceState,
+                            partialText = voicePartialText,
+                            handsFree = handsFree,
+                            speakReplies = speakReplies,
+                            onVoice = onVoice,
+                            onStopVoice = onStopVoice,
+                            onToggleHandsFree = onToggleHandsFree,
+                            onToggleSpeech = onToggleSpeech
+                        )
+                    }
+
+                    item {
                         QuickActionsCard(
                             enabled = !busy && providerReady,
                             onReadScreen = {
@@ -200,6 +222,21 @@ fun AiAgentScreen(
                             serviceRunning = foregroundServiceRunning,
                             onSetup = { showSettings = true },
                             onStop = { engine.cancelCurrentTask() }
+                        )
+                    }
+                }
+
+                if (messages.isNotEmpty() && (voiceState != AiVoiceState.IDLE || handsFree)) {
+                    item {
+                        VoiceControlCard(
+                            voiceState = voiceState,
+                            partialText = voicePartialText,
+                            handsFree = handsFree,
+                            speakReplies = speakReplies,
+                            onVoice = onVoice,
+                            onStopVoice = onStopVoice,
+                            onToggleHandsFree = onToggleHandsFree,
+                            onToggleSpeech = onToggleSpeech
                         )
                     }
                 }
@@ -241,8 +278,15 @@ fun AiAgentScreen(
             AgentInputBar(
                 input = input,
                 busy = busy,
+                voiceState = voiceState,
+                handsFree = handsFree,
+                speakReplies = speakReplies,
                 onInputChanged = { input = it },
-                onVoice = onVoice,
+                onVoice = {
+                    if (voiceState == AiVoiceState.LISTENING) onStopVoice() else onVoice()
+                },
+                onToggleHandsFree = onToggleHandsFree,
+                onToggleSpeech = onToggleSpeech,
                 onSend = {
                     val text = input.trim()
                     if (text.isNotBlank()) {
@@ -322,9 +366,14 @@ private fun AgentStatusPill(
     providerReady: Boolean,
     busy: Boolean,
     pending: Boolean,
-    serviceRunning: Boolean
+    serviceRunning: Boolean,
+    voiceState: AiVoiceState
 ) {
     val label = when {
+        voiceState == AiVoiceState.LISTENING -> "listening"
+        voiceState == AiVoiceState.PROCESSING -> "processing voice"
+        voiceState == AiVoiceState.SPEAKING -> "speaking"
+        voiceState == AiVoiceState.ERROR -> "voice issue"
         pending -> "needs approval"
         busy && serviceRunning -> "working in background"
         busy -> "working"
@@ -712,49 +761,148 @@ private fun SetupCard(
 private fun AgentInputBar(
     input: String,
     busy: Boolean,
+    voiceState: AiVoiceState,
+    handsFree: Boolean,
+    speakReplies: Boolean,
     onInputChanged: (String) -> Unit,
     onVoice: () -> Unit,
+    onToggleHandsFree: () -> Unit,
+    onToggleSpeech: () -> Unit,
     onSend: () -> Unit
 ) {
     Surface(
         tonalElevation = 5.dp,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(10.dp),
-            verticalAlignment = Alignment.Bottom
-        ) {
-            IconButton(
-                onClick = onVoice,
-                enabled = !busy
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.Bottom
             ) {
-                Icon(
-                    Icons.Default.Mic,
-                    contentDescription = "Voice input"
+                IconButton(onClick = onVoice, enabled = !busy) {
+                    Icon(
+                        if (voiceState == AiVoiceState.LISTENING) Icons.Default.MicOff else Icons.Default.Mic,
+                        contentDescription = if (voiceState == AiVoiceState.LISTENING) "Stop listening" else "Start voice input"
+                    )
+                }
+
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = onInputChanged,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    placeholder = {
+                        Text(
+                            when (voiceState) {
+                                AiVoiceState.LISTENING -> "Listening…"
+                                AiVoiceState.SPEAKING -> "Dicio is speaking…"
+                                else -> "Ask Dicio to do something…"
+                            }
+                        )
+                    },
+                    maxLines = 5,
+                    enabled = !busy
                 )
+
+                IconButton(onClick = onSend, enabled = !busy && input.isNotBlank()) {
+                    Icon(Icons.Default.Send, contentDescription = "Send")
+                }
             }
 
-            OutlinedTextField(
-                value = input,
-                onValueChange = onInputChanged,
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                placeholder = { Text("Ask Dicio to do something…") },
-                maxLines = 5,
-                enabled = !busy
-            )
-
-            IconButton(
-                onClick = onSend,
-                enabled = !busy && input.isNotBlank()
+                    .fillMaxWidth()
+                    .padding(start = 14.dp, end = 14.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    Icons.Default.Send,
-                    contentDescription = "Send"
-                )
+                TextButton(onClick = onToggleHandsFree) {
+                    Text(if (handsFree) "Hands-free on" else "Hands-free")
+                }
+                TextButton(onClick = onToggleSpeech) {
+                    Text(if (speakReplies) "Speak replies on" else "Speak replies")
+                }
+                if (voiceState == AiVoiceState.LISTENING) {
+                    Text(
+                        "Listening…",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 4.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun VoiceControlCard(
+    voiceState: AiVoiceState,
+    partialText: String,
+    handsFree: Boolean,
+    speakReplies: Boolean,
+    onVoice: () -> Unit,
+    onStopVoice: () -> Unit,
+    onToggleHandsFree: () -> Unit,
+    onToggleSpeech: () -> Unit
+) {
+    Surface(
+        tonalElevation = if (voiceState == AiVoiceState.LISTENING || voiceState == AiVoiceState.SPEAKING) 5.dp else 3.dp,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Surface(tonalElevation = 2.dp, shape = MaterialTheme.shapes.large) {
+                    IconButton(
+                        onClick = {
+                            if (voiceState == AiVoiceState.LISTENING || voiceState == AiVoiceState.SPEAKING) onStopVoice()
+                            else onVoice()
+                        },
+                        modifier = Modifier.size(56.dp)
+                    ) {
+                        Icon(
+                            if (voiceState == AiVoiceState.LISTENING) Icons.Default.MicOff else Icons.Default.Mic,
+                            contentDescription = "Voice control"
+                        )
+                    }
+                }
+
+                Column(modifier = Modifier.padding(start = 12.dp)) {
+                    Text(
+                        when (voiceState) {
+                            AiVoiceState.LISTENING -> "Listening"
+                            AiVoiceState.PROCESSING -> "Processing"
+                            AiVoiceState.SPEAKING -> "Speaking"
+                            AiVoiceState.ERROR -> "Voice needs attention"
+                            AiVoiceState.IDLE -> if (handsFree) "Hands-free ready" else "Talk to Dicio"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        when (voiceState) {
+                            AiVoiceState.LISTENING -> if (partialText.isBlank()) "Tell me what you want done." else partialText
+                            AiVoiceState.PROCESSING -> "Turning your request into an agent task…"
+                            AiVoiceState.SPEAKING -> "Dicio is reading the latest response."
+                            AiVoiceState.ERROR -> "Tap the microphone to try again."
+                            AiVoiceState.IDLE -> if (handsFree) "I’ll listen again after each response." else "Speak a task instead of typing it."
+                        },
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onToggleHandsFree) {
+                    Text(if (handsFree) "Turn hands-free off" else "Turn hands-free on")
+                }
+                TextButton(onClick = onToggleSpeech) {
+                    Text(if (speakReplies) "Mute replies" else "Speak replies")
+                }
             }
         }
     }
