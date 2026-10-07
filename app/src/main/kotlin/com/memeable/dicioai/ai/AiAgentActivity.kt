@@ -27,7 +27,7 @@ class AiAgentActivity : ComponentActivity() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1 && intent?.getBooleanExtra(EXTRA_AUTO_LISTEN, false) == true) {
             setShowWhenLocked(true); setTurnScreenOn(true)
         }
-        engine = AiAgentEngine(applicationContext)
+        engine = AiAgentRuntime.get(applicationContext)
         autoListen = intent?.getBooleanExtra(EXTRA_AUTO_LISTEN, false) == true
         val scheduledRequest = intent?.getStringExtra(EXTRA_RUN_TASK)
         setContent {
@@ -41,7 +41,10 @@ class AiAgentActivity : ComponentActivity() {
                         startActivity(Intent(this@AiAgentActivity, org.stypox.dicio.MainActivity::class.java))
                         finish()
                     },
-                    onVoice = { launchVoiceInput() }
+                    onVoice = { launchVoiceInput() },
+                    onTaskCenter = {
+                        startActivity(Intent(this@AiAgentActivity, AiTaskCenterActivity::class.java))
+                    }
                 )
             }
         }

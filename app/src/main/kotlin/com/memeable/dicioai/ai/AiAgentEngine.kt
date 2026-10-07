@@ -284,6 +284,44 @@ class AiAgentEngine(private val context: Context) {
     fun memorySnapshot(): List<AiMemory> = memory.list()
     fun taskSnapshot(): List<AiTaskCheckpoint> = taskStore.list()
 
+    fun resumeTaskFromCenter(id: String): Boolean {
+        if (id.isBlank() || _busy.value) return false
+        val task = taskStore.find(id) ?: return false
+        if (task.status in setOf("CANCELLED", "FAILED", "COMPLETED")) return false
+        AiAgentForegroundService.startExistingTask(context, id)
+        return true
+    }
+
+    fun stopTaskFromCenter(id: String): Boolean {
+        if (id.isBlank()) return false
+        val task = taskStore.find(id) ?: return false
+        if (activeTaskId == id) return cancelCurrentTask()
+        if (task.status !in setOf("RUNNING", "WAITING_CONFIRMATION")) return false
+        cancelledTasks.add(id)
+        taskStore.save(task.copy(status = "CANCELLED", updatedAt = System.currentTimeMillis()))
+        if (task.status == "WAITING_CONFIRMATION") {
+            pendingContinuation = null
+            _pendingConfirmation.value = null
+        }
+        return true
+    }
+
+    fun retryTaskFromCenter(id: String): Boolean {
+        if (id.isBlank() || _busy.value) return false
+        val task = taskStore.find(id) ?: return false
+        if (task.status in setOf("RUNNING", "WAITING_CONFIRMATION")) return false
+        startTaskDirect(task.request, null)
+        return true
+    }
+
+    fun deleteTaskFromCenter(id: String): Boolean {
+        if (id.isBlank()) return false
+        val task = taskStore.find(id) ?: return false
+        if (task.status in setOf("RUNNING", "WAITING_CONFIRMATION") || activeTaskId == id) return false
+        taskStore.remove(id)
+        return true
+    }
+
     fun cancelCurrentTask(): Boolean {
         val id = activeTaskId ?: return false
         cancelledTasks.add(id); taskStore.list().firstOrNull { it.id == id }?.let { taskStore.save(it.copy(status = "CANCELLED")) }
@@ -718,7 +756,31 @@ class AiAgentEngine(private val context: Context) {
     private fun deviceInfo(): String { val bm = context.getSystemService(Context.BATTERY_SERVICE) as BatteryManager; val battery = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY); return "Battery: $battery%; Android: ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT}); device: ${Build.MANUFACTURER} ${Build.MODEL}; locale: ${java.util.Locale.getDefault()}" }
 
     private fun event(tool: String, status: String, detail: String) {
-        val item = AiAgentEvent(System.currentTimeMillis(), tool, status, detail); _events.value = (_events.value + item).takeLast(30); executionLog.add(tool, status, detail)
+        val timestamp = System.currentTimeMillis()
+        val item = AiAgentEvent(timestamp, tool, status, detail)
+        _events.value = (_events.value + item).takeLast(30)
+        executionLog.add(tool, status, detail)
+
+        activeTaskId?.let { taskId ->
+            taskStore.find(taskId)?.let { task ->
+                val timelineItem = AiTaskTimelineEntry(
+                    id = timestamp,
+                    timestamp = timestamp,
+                    tool = tool,
+                    status = status,
+                    detail = detail.take(400),
+                    step = task.step.coerceAtLeast(1)
+                )
+                taskStore.save(
+                    task.copy(
+                        lastTool = tool,
+                        updatedAt = timestamp,
+                        timeline = (task.timeline + timelineItem)
+                            .takeLast(AiTaskStore.MAX_TIMELINE_ENTRIES)
+                    )
+                )
+            }
+        }
     }
     private fun clearEvents() { _events.value = emptyList() }
     private fun addMessage(message: AiUiMessage) { _messages.value = (_messages.value + message).takeLast(MAX_SAVED_MESSAGES) }

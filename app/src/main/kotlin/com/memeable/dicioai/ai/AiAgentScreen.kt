@@ -1,106 +1,57 @@
 package com.memeable.dicioai.ai
+import kotlinx.coroutines.delay
 
 import android.content.Intent
 import android.provider.Settings
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Arrangement
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Box
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Column
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.PaddingValues
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Row
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Spacer
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.fillMaxSize
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.fillMaxWidth
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.height
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.imePadding
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.padding
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.size
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.widthIn
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.lazy.LazyColumn
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.lazy.items
-import kotlinx.coroutines.delay
 import androidx.compose.foundation.lazy.rememberLazyListState
-import kotlinx.coroutines.delay
 import androidx.compose.material.icons.Icons
-import kotlinx.coroutines.delay
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import kotlinx.coroutines.delay
 import androidx.compose.material.icons.filled.Delete
-import kotlinx.coroutines.delay
 import androidx.compose.material.icons.filled.Mic
-import kotlinx.coroutines.delay
 import androidx.compose.material.icons.filled.Send
-import kotlinx.coroutines.delay
 import androidx.compose.material.icons.filled.Settings
-import kotlinx.coroutines.delay
 import androidx.compose.material3.AlertDialog
-import kotlinx.coroutines.delay
 import androidx.compose.material3.Button
-import kotlinx.coroutines.delay
 import androidx.compose.material3.CircularProgressIndicator
-import kotlinx.coroutines.delay
 import androidx.compose.material3.ExperimentalMaterial3Api
-import kotlinx.coroutines.delay
 import androidx.compose.material3.FilledTonalButton
-import kotlinx.coroutines.delay
 import androidx.compose.material3.Icon
-import kotlinx.coroutines.delay
 import androidx.compose.material3.IconButton
-import kotlinx.coroutines.delay
 import androidx.compose.material3.MaterialTheme
-import kotlinx.coroutines.delay
 import androidx.compose.material3.OutlinedTextField
-import kotlinx.coroutines.delay
 import androidx.compose.material3.Scaffold
-import kotlinx.coroutines.delay
 import androidx.compose.material3.Surface
-import kotlinx.coroutines.delay
 import androidx.compose.material3.Text
-import kotlinx.coroutines.delay
 import androidx.compose.material3.TextButton
-import kotlinx.coroutines.delay
 import androidx.compose.material3.TopAppBar
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.Composable
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.LaunchedEffect
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.getValue
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.mutableStateOf
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.remember
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.saveable.rememberSaveable
-import kotlinx.coroutines.delay
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
-import kotlinx.coroutines.delay
 import androidx.compose.ui.platform.LocalContext
-import kotlinx.coroutines.delay
 import androidx.compose.ui.text.font.FontWeight
-import kotlinx.coroutines.delay
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -108,7 +59,8 @@ import androidx.compose.ui.unit.sp
 fun AiAgentScreen(
     engine: AiAgentEngine,
     onBack: () -> Unit,
-    onVoice: () -> Unit
+    onVoice: () -> Unit,
+    onTaskCenter: () -> Unit
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(false) }
@@ -175,6 +127,9 @@ fun AiAgentScreen(
                     }
                 },
                 actions = {
+                    TextButton(onClick = onTaskCenter) {
+                        Text("Tasks")
+                    }
                     TextButton(onClick = onBack) {
                         Text("Classic")
                     }

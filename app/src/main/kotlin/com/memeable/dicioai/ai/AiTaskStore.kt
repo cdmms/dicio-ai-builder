@@ -6,6 +6,16 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @Serializable
+data class AiTaskTimelineEntry(
+    val id: Long,
+    val timestamp: Long,
+    val tool: String,
+    val status: String,
+    val detail: String,
+    val step: Int = 0,
+)
+
+@Serializable
 data class AiTaskCheckpoint(
     val id: String,
     val request: String,
@@ -13,12 +23,12 @@ data class AiTaskCheckpoint(
     val step: Int = 0,
     val lastTool: String? = null,
     val updatedAt: Long = System.currentTimeMillis(),
-    // Agent 0.8: durable conversation state for recovery after process death.
     val conversationJson: String? = null,
     val pendingCallId: String? = null,
     val pendingTool: String? = null,
     val pendingArguments: String? = null,
     val pendingSummary: String? = null,
+    val timeline: List<AiTaskTimelineEntry> = emptyList(),
 )
 
 class AiTaskStore(context: Context) {
@@ -37,8 +47,21 @@ class AiTaskStore(context: Context) {
 
     @Synchronized
     fun save(task: AiTaskCheckpoint) {
+        val previous = list().firstOrNull { it.id == task.id }
+        // Older Agent 0.8 call sites update checkpoints without carrying the
+        // timeline field. Preserve an existing timeline instead of erasing it.
+        val merged = if (
+            previous != null &&
+            task.timeline.isEmpty() &&
+            previous.timeline.isNotEmpty()
+        ) {
+            task.copy(timeline = previous.timeline)
+        } else {
+            task
+        }
+
         val current = (
-            list().filterNot { it.id == task.id } + task
+            list().filterNot { it.id == merged.id } + merged
         ).sortedByDescending { it.updatedAt }.take(MAX_TASKS)
         prefs.edit().putString(KEY, json.encodeToString(current)).apply()
     }
@@ -51,5 +74,6 @@ class AiTaskStore(context: Context) {
     companion object {
         private const val KEY = "tasks"
         private const val MAX_TASKS = 40
+        const val MAX_TIMELINE_ENTRIES = 120
     }
 }
