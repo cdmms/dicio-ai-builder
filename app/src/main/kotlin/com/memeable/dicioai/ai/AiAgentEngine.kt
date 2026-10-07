@@ -101,23 +101,181 @@ class AiAgentEngine(private val context: Context) {
 
     fun enqueue(text: String) {
         if (_busy.value) return
-        val clean = text.trim(); if (clean.isBlank()) return
-        addMessage(AiUiMessage(++nextId, "user", clean))
-        val taskId = "task-${System.currentTimeMillis()}-$nextId"
-        taskStore.save(AiTaskCheckpoint(taskId, clean, "RUNNING", 0, null))
-        activeTaskId = taskId; cancelledTasks.remove(taskId)
+        val clean = text.trim()
+        if (clean.isBlank()) return
+        AiAgentForegroundService.startTask(context, clean)
+    }
+
+    fun startNewTaskFromService(text: String) {
+        if (_busy.value) return
+        startTaskDirect(text.trim(), null)
+    }
+
+    fun startExistingTaskFromService(taskId: String?): Boolean {
+        if (_busy.value || taskId.isNullOrBlank()) return false
+
+        val task = taskStore.list().firstOrNull { it.id == taskId }
+            ?: return false
+
+        if (task.status in setOf("CANCELLED", "FAILED", "COMPLETED")) {
+            return false
+        }
+
+        startTaskDirect(task.request, task.id)
+        return true
+    }
+
+    fun confirmPendingFromService(approved: Boolean) {
+        confirmPending(approved)
+    }
+
+    fun restoreInterruptedTaskFromService(): Boolean {
+        if (_busy.value) return true
+
+        val task = taskStore.list().firstOrNull {
+            it.status == "RUNNING" || it.status == "WAITING_CONFIRMATION"
+        } ?: return false
+
+        /*
+         * Conversation/tool-call state is not serialized as a complete
+         * provider conversation yet. Restart the saved request safely.
+         * Consequential actions remain confirmation-gated.
+         */
+        startTaskDirect(task.request, task.id)
+        return true
+    }
+
+    private fun startTaskDirect(text: String, existingTaskId: String?) {
+        val clean = text.trim()
+        if (clean.isBlank() || _busy.value) return
+
+        val taskId = existingTaskId ?: "task-${System.currentTimeMillis()}-${++nextId}"
+
+        if (existingTaskId == null) {
+            addMessage(AiUiMessage(nextId, "user", clean))
+        }
+
+        taskStore.save(
+            AiTaskCheckpoint(
+                id = taskId,
+                request = clean,
+                status = "RUNNING",
+                step = 0,
+                lastTool = null,
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+
+        activeTaskId = taskId
+        cancelledTasks.remove(taskId)
+
+        taskStore.list()
+            .firstOrNull { it.id == taskId }
+            ?.let {
+                AiAgentNotifications.showRunning(
+                    context,
+                    it,
+                    "Starting"
+                )
+            }
+
         currentJob = scope.launch {
-            _busy.value = true; clearEvents()
+            _busy.value = true
+            clearEvents()
+
             try {
                 val reply = runAgent(clean, taskId)
-                if (_pendingConfirmation.value == null && !cancelledTasks.contains(taskId)) taskStore.save(AiTaskCheckpoint(taskId, clean, "COMPLETED", 0, null))
-                addMessage(AiUiMessage(++nextId, "assistant", reply))
+
+                if (
+                    _pendingConfirmation.value == null &&
+                    !cancelledTasks.contains(taskId)
+                ) {
+                    val current = taskStore.list()
+                        .firstOrNull { it.id == taskId }
+
+                    val completed = AiTaskCheckpoint(
+                        id = taskId,
+                        request = clean,
+                        status = "COMPLETED",
+                        step = maxOf(
+                            current?.step ?: 0,
+                            MAX_AGENT_ROUNDS
+                        ),
+                        lastTool = current?.lastTool,
+                        updatedAt = System.currentTimeMillis()
+                    )
+
+                    taskStore.save(completed)
+
+                    AiAgentNotifications.showResult(
+                        context,
+                        completed,
+                        "Dicio AI task complete",
+                        reply
+                    )
+                }
+
+                addMessage(
+                    AiUiMessage(
+                        ++nextId,
+                        "assistant",
+                        reply
+                    )
+                )
             } catch (t: Throwable) {
-                val status = if (cancelledTasks.contains(taskId)) "CANCELLED" else "FAILED"
-                taskStore.save(AiTaskCheckpoint(taskId, clean, status, 0, null))
-                addMessage(AiUiMessage(++nextId, "assistant", if (status == "CANCELLED") "Task cancelled." else "I hit an error: ${t.message ?: "unknown error"}"))
+                val status =
+                    if (cancelledTasks.contains(taskId)) {
+                        "CANCELLED"
+                    } else {
+                        "FAILED"
+                    }
+
+                val current = taskStore.list()
+                    .firstOrNull { it.id == taskId }
+
+                val failed = AiTaskCheckpoint(
+                    id = taskId,
+                    request = clean,
+                    status = status,
+                    step = current?.step ?: 0,
+                    lastTool = current?.lastTool,
+                    updatedAt = System.currentTimeMillis()
+                )
+
+                taskStore.save(failed)
+
+                addMessage(
+                    AiUiMessage(
+                        ++nextId,
+                        "assistant",
+                        if (status == "CANCELLED") {
+                            "Task cancelled."
+                        } else {
+                            "I hit an error: ${t.message ?: "unknown error"}"
+                        }
+                    )
+                )
+
+                AiAgentNotifications.showResult(
+                    context,
+                    failed,
+                    if (status == "CANCELLED") {
+                        "Dicio AI task stopped"
+                    } else {
+                        "Dicio AI task failed"
+                    },
+                    if (status == "CANCELLED") {
+                        "The task was stopped."
+                    } else {
+                        "I hit an error: ${t.message ?: "unknown error"}"
+                    }
+                )
             } finally {
-                saveHistory(); _busy.value = false; activeTaskId = null; currentJob = null
+                saveHistory()
+                _busy.value = false
+                activeTaskId = null
+                currentJob = null
+                AiAgentForegroundService.stop(context)
             }
         }
     }
@@ -163,7 +321,20 @@ class AiAgentEngine(private val context: Context) {
 
     fun openAccessibilitySettings() { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     fun clearHistory() { prefs.edit().remove("history").apply(); scope.launch(Dispatchers.Main.immediate) { _messages.value = emptyList() } }
-    fun resumeLastInterruptedTask() { if (_busy.value) return; taskStore.list().firstOrNull { it.status == "RUNNING" || it.status == "WAITING_CONFIRMATION" }?.let { enqueue(it.request) } }
+    fun resumeLastInterruptedTask() {
+        if (_busy.value) return
+
+        taskStore.list()
+            .firstOrNull {
+                it.status == "RUNNING" || it.status == "WAITING_CONFIRMATION"
+            }
+            ?.let {
+                AiAgentForegroundService.startExistingTask(
+                    context,
+                    it.id
+                )
+            }
+    }
     fun saveConfig(endpoint: String, model: String, apiKey: String, systemPrompt: String) {
         prefs.edit().putString("endpoint", if (endpoint.isBlank()) DEFAULT_ENDPOINT else endpoint).putString("model", if (model.isBlank()) DEFAULT_MODEL else model).putString("system_prompt", if (systemPrompt.isBlank()) DEFAULT_SYSTEM_PROMPT else systemPrompt).putLong("config_revision", System.currentTimeMillis()).apply()
         SecureSecretStore.put(context, apiKey)
@@ -450,7 +621,8 @@ class AiAgentEngine(private val context: Context) {
         val task = taskStore.list().firstOrNull { it.id == id } ?: return "No task with id $id."
         if (task.status in setOf("CANCELLED", "FAILED", "COMPLETED")) return "Task $id is not resumable because its status is ${task.status}."
         if (_busy.value) return "Another task is currently running. Finish or cancel it before resuming $id."
-        enqueue(task.request); return "Task $id queued for resume."
+        AiAgentForegroundService.startExistingTask(context, id)
+        return "Task $id queued for resume."
     }
 
     private fun cancelTask(id: String): String {
