@@ -33,8 +33,8 @@ android {
         applicationId = "com.memeable.dicioai"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 801
-        versionName = "0.8.1-unstable"
+        versionCode = 700
+        versionName = "0.7.0-unstable"
         testInstrumentationRunner = "org.stypox.dicio.CustomTestRunner"
 
         vectorDrawables.useSupportLibrary = true

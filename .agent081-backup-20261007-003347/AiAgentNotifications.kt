@@ -15,8 +15,6 @@ object AiAgentNotifications {
     private const val RUNNING_CHANNEL = "dicio_ai_agent_running"
     private const val ALERT_CHANNEL = "dicio_ai_agent_alerts"
     private const val RUNNING_ID = 8701
-    private const val RUNNING_UPDATE_MIN_MS = 800L
-    @Volatile private var lastRunningUpdateAt = 0L
 
     private fun manager(context: Context): NotificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -94,11 +92,6 @@ object AiAgentNotifications {
         detail: String
     ) {
         if (!canPostAlerts(context)) return
-
-        val now = System.currentTimeMillis()
-        if (now - lastRunningUpdateAt < RUNNING_UPDATE_MIN_MS) return
-        lastRunningUpdateAt = now
-
         ensureChannels(context)
         val step = task.step.coerceAtLeast(1)
         val lastTool = task.lastTool?.takeIf { it.isNotBlank() }
@@ -142,26 +135,6 @@ object AiAgentNotifications {
             Notification.Builder(context)
         }
         val id = task.id.hashCode() and 0x7fffffff
-        val approveIntent = Intent(context, AiAgentForegroundService::class.java)
-            .setAction(AiAgentForegroundService.ACTION_APPROVE)
-            .putExtra(AiAgentForegroundService.EXTRA_APPROVED, true)
-        val approvePending = PendingIntent.getService(
-            context,
-            id xor 0x11,
-            approveIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val cancelIntent = Intent(context, AiAgentForegroundService::class.java)
-            .setAction(AiAgentForegroundService.ACTION_APPROVE)
-            .putExtra(AiAgentForegroundService.EXTRA_APPROVED, false)
-        val cancelPending = PendingIntent.getService(
-            context,
-            id xor 0x12,
-            cancelIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
         manager(context).notify(
             id,
             builder
@@ -170,8 +143,6 @@ object AiAgentNotifications {
                 .setContentText(summary.take(180))
                 .setStyle(Notification.BigTextStyle().bigText(summary))
                 .setContentIntent(openAgent(context))
-                .addAction(0, "Approve", approvePending)
-                .addAction(0, "Cancel", cancelPending)
                 .setAutoCancel(true)
                 .build()
         )
