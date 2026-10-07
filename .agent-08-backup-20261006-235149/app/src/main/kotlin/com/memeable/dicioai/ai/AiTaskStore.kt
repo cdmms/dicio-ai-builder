@@ -13,38 +13,22 @@ data class AiTaskCheckpoint(
     val step: Int = 0,
     val lastTool: String? = null,
     val updatedAt: Long = System.currentTimeMillis(),
-    // Agent 0.8: durable conversation state for recovery after process death.
-    val conversationJson: String? = null,
-    val pendingCallId: String? = null,
-    val pendingTool: String? = null,
-    val pendingArguments: String? = null,
-    val pendingSummary: String? = null,
 )
 
 class AiTaskStore(context: Context) {
     private val prefs = context.getSharedPreferences("dicio_ai_tasks", Context.MODE_PRIVATE)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
-    @Synchronized
-    fun list(): List<AiTaskCheckpoint> = runCatching {
-        json.decodeFromString<List<AiTaskCheckpoint>>(
-            prefs.getString(KEY, "[]") ?: "[]"
-        ).sortedByDescending { it.updatedAt }
+    @Synchronized fun list(): List<AiTaskCheckpoint> = runCatching {
+        json.decodeFromString<List<AiTaskCheckpoint>>(prefs.getString(KEY, "[]") ?: "[]").sortedByDescending { it.updatedAt }
     }.getOrDefault(emptyList())
 
-    @Synchronized
-    fun find(id: String): AiTaskCheckpoint? = list().firstOrNull { it.id == id }
-
-    @Synchronized
-    fun save(task: AiTaskCheckpoint) {
-        val current = (
-            list().filterNot { it.id == task.id } + task
-        ).sortedByDescending { it.updatedAt }.take(MAX_TASKS)
+    @Synchronized fun save(task: AiTaskCheckpoint) {
+        val current = (list().filterNot { it.id == task.id } + task).sortedByDescending { it.updatedAt }.take(MAX_TASKS)
         prefs.edit().putString(KEY, json.encodeToString(current)).apply()
     }
 
-    @Synchronized
-    fun remove(id: String) {
+    @Synchronized fun remove(id: String) {
         prefs.edit().putString(KEY, json.encodeToString(list().filterNot { it.id == id })).apply()
     }
 
