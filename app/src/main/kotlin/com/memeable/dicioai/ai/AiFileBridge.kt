@@ -86,13 +86,34 @@ object AiFileBridge {
     }
 
     private fun readContentUri(context: Context, uri: Uri): String = runCatching {
-        context.contentResolver.openInputStream(uri)?.use { input -> String(input.readNBytes(MAX_READ_BYTES), StandardCharsets.UTF_8) }
-            ?: "Could not open document."
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            String(readLimited(input), StandardCharsets.UTF_8)
+        } ?: "Could not open document."
     }.getOrElse { "Could not read document: ${it.message ?: "unknown error"}" }
 
     private fun readFile(file: File): String = runCatching {
-        file.inputStream().use { input -> String(input.readNBytes(MAX_READ_BYTES), StandardCharsets.UTF_8) }
+        file.inputStream().use { input ->
+            String(readLimited(input), StandardCharsets.UTF_8)
+        }
     }.getOrElse { "Could not read file: ${it.message ?: "unknown error"}" }
+
+    private fun readLimited(input: java.io.InputStream): ByteArray {
+        val buffer = ByteArray(MAX_READ_BYTES)
+        var total = 0
+
+        while (total < MAX_READ_BYTES) {
+            val count = input.read(
+                buffer,
+                total,
+                MAX_READ_BYTES - total
+            )
+
+            if (count <= 0) break
+            total += count
+        }
+
+        return buffer.copyOf(total)
+    }
 
     private fun resolveManaged(context: Context, target: String): File? {
         val clean = target.trim().replace('\\', '/').removePrefix("/")
