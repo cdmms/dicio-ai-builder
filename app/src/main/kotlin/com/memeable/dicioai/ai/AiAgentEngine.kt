@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -96,14 +97,25 @@ class AiAgentEngine(private val context: Context) {
     val model: String get() = prefs.getString("model", DEFAULT_MODEL) ?: DEFAULT_MODEL
     val apiKey: String get() = SecureSecretStore.get(context) ?: ""
     val systemPrompt: String get() = prefs.getString("system_prompt", DEFAULT_SYSTEM_PROMPT) ?: DEFAULT_SYSTEM_PROMPT
-    val isConfigured: Boolean get() = apiKey.isNotBlank() || endpoint.startsWith("http://") || endpoint.startsWith("https://127.0.0.1") || endpoint.startsWith("https://localhost")
+    val visionModelName: String get() = prefs.getString("vision_model", DEFAULT_VISION_MODEL) ?: DEFAULT_VISION_MODEL
+    val isConfigured: Boolean
+        get() {
+            if (apiKey.isNotBlank()) return true
+            return !endpoint.contains("openrouter.ai", ignoreCase = true)
+        }
     val configRevision: Long get() = prefs.getLong("config_revision", 0L)
 
     fun enqueue(text: String) {
         if (_busy.value) return
+        if (_pendingConfirmation.value != null) {
+            publishSystem("Approve or cancel the pending action before starting another task.")
+            return
+        }
         val clean = text.trim()
         if (clean.isBlank()) return
-        AiAgentForegroundService.startTask(context, clean)
+        if (!AiAgentForegroundService.startTask(context, clean)) {
+            publishSystem("Dicio AI could not start its background service. Keep the app open and try again.")
+        }
     }
 
     fun startNewTaskFromService(text: String) {
@@ -114,46 +126,103 @@ class AiAgentEngine(private val context: Context) {
     fun startExistingTaskFromService(taskId: String?): Boolean {
         if (_busy.value || taskId.isNullOrBlank()) return false
 
-        val task = taskStore.list().firstOrNull { it.id == taskId }
-            ?: return false
+        val task = taskStore.find(taskId) ?: return false
+        if (task.status in setOf("CANCELLED", "FAILED", "COMPLETED")) return false
 
-        if (task.status in setOf("CANCELLED", "FAILED", "COMPLETED")) {
-            return false
+        if (task.status == "WAITING_CONFIRMATION") {
+            if (restorePendingConfirmation(task)) {
+                AiAgentForegroundService.stop(context)
+                return true
+            }
+            startTaskDirect(
+                task.request,
+                task.id,
+                task.copy(
+                    status = "RUNNING",
+                    conversationJson = null,
+                    pendingCallId = null,
+                    pendingTool = null,
+                    pendingArguments = null,
+                    pendingSummary = null
+                )
+            )
+            return true
         }
 
-        startTaskDirect(task.request, task.id)
+        startTaskDirect(task.request, task.id, task)
         return true
     }
 
-    fun confirmPendingFromService(approved: Boolean) {
-        confirmPending(approved)
+    fun confirmPendingFromService(approved: Boolean, requestedTaskId: String? = null) {
+        confirmPendingInternal(approved, requestedTaskId)
     }
 
     fun restoreInterruptedTaskFromService(): Boolean {
         if (_busy.value) return true
-
         val task = taskStore.list().firstOrNull {
             it.status == "RUNNING" || it.status == "WAITING_CONFIRMATION"
         } ?: return false
 
-        /*
-         * Conversation/tool-call state is not serialized as a complete
-         * provider conversation yet. Restart the saved request safely.
-         * Consequential actions remain confirmation-gated.
-         */
-        startTaskDirect(task.request, task.id)
+        if (task.status == "WAITING_CONFIRMATION") {
+            if (restorePendingConfirmation(task)) {
+                AiAgentForegroundService.stop(context)
+                return true
+            }
+            startTaskDirect(
+                task.request,
+                task.id,
+                task.copy(
+                    status = "RUNNING",
+                    conversationJson = null,
+                    pendingCallId = null,
+                    pendingTool = null,
+                    pendingArguments = null,
+                    pendingSummary = null
+                )
+            )
+            return true
+        }
+
+        startTaskDirect(task.request, task.id, task)
         return true
     }
 
-    private fun startTaskDirect(text: String, existingTaskId: String?) {
+    private fun restorePendingConfirmation(task: AiTaskCheckpoint): Boolean {
+        if (task.status != "WAITING_CONFIRMATION") return false
+        val tool = task.pendingTool?.takeIf { it.isNotBlank() } ?: return false
+        val arguments = task.pendingArguments ?: return false
+        val callId = task.pendingCallId?.takeIf { it.isNotBlank() } ?: return false
+        val conversationJson = task.conversationJson?.takeIf { it.isNotBlank() } ?: return false
+        val conversation = runCatching {
+            json.decodeFromString<List<AiChatMessage>>(conversationJson)
+        }.getOrNull()?.takeIf { it.isNotEmpty() } ?: return false
+        val summary = task.pendingSummary ?: confirmationSummary(tool, arguments)
+
+        pendingContinuation = PendingContinuation(
+            task.id,
+            task.request,
+            conversation,
+            callId,
+            (task.step - 1).coerceAtLeast(0)
+        )
+        _pendingConfirmation.value = PendingConfirmation(tool, arguments, summary)
+        AiAgentNotifications.showConfirmation(context, task, summary)
+        return true
+    }
+
+    private fun startTaskDirect(
+        text: String,
+        existingTaskId: String?,
+        checkpointToResume: AiTaskCheckpoint? = null
+    ) {
         val clean = text.trim()
         if (clean.isBlank() || _busy.value) return
 
         val taskId = existingTaskId ?: "task-${System.currentTimeMillis()}-${++nextId}"
+        val previous = checkpointToResume ?: existingTaskId?.let { taskStore.find(it) }
+        val savedConversation = previous?.conversationJson?.takeIf { it.isNotBlank() }
 
-        if (existingTaskId == null) {
-            addMessage(AiUiMessage(nextId, "user", clean))
-        }
+        if (existingTaskId == null) addMessage(AiUiMessage(nextId, "user", clean))
 
         taskStore.save(
             AiTaskCheckpoint(
@@ -161,114 +230,75 @@ class AiAgentEngine(private val context: Context) {
                 request = clean,
                 status = "RUNNING",
                 step = 0,
-                lastTool = null,
-                updatedAt = System.currentTimeMillis()
+                lastTool = previous?.lastTool,
+                updatedAt = System.currentTimeMillis(),
+                conversationJson = savedConversation,
+                timeline = previous?.timeline.orEmpty()
             )
         )
-
         activeTaskId = taskId
         cancelledTasks.remove(taskId)
-
-        taskStore.list()
-            .firstOrNull { it.id == taskId }
-            ?.let {
-                AiAgentNotifications.showRunning(
-                    context,
-                    it,
-                    "Starting"
-                )
-            }
+        taskStore.find(taskId)?.let { AiAgentNotifications.showRunning(context, it, "Starting") }
 
         currentJob = scope.launch {
             _busy.value = true
             clearEvents()
-
             try {
-                val reply = runAgent(clean, taskId)
+                val restoredConversation = savedConversation?.let { encoded ->
+                    runCatching {
+                        json.decodeFromString<List<AiChatMessage>>(encoded).toMutableList()
+                    }.getOrNull()?.takeIf { it.isNotEmpty() }
+                }
+                val reply = if (restoredConversation != null) {
+                    continueAgent(restoredConversation, taskId, clean, 0)
+                } else {
+                    runAgent(clean, taskId)
+                }
+                val paused = reply.startsWith("I reached the ${MAX_AGENT_ROUNDS}-step agent limit")
 
-                if (
-                    _pendingConfirmation.value == null &&
-                    !cancelledTasks.contains(taskId)
-                ) {
-                    val current = taskStore.list()
-                        .firstOrNull { it.id == taskId }
-
-                    val completed = AiTaskCheckpoint(
+                if (_pendingConfirmation.value == null && !cancelledTasks.contains(taskId)) {
+                    val current = taskStore.find(taskId)
+                    val finalTask = AiTaskCheckpoint(
                         id = taskId,
                         request = clean,
-                        status = "COMPLETED",
-                        step = maxOf(
-                            current?.step ?: 0,
-                            MAX_AGENT_ROUNDS
-                        ),
+                        status = if (paused) "PAUSED" else "COMPLETED",
+                        step = if (paused) MAX_AGENT_ROUNDS else (current?.step ?: 0),
                         lastTool = current?.lastTool,
-                        updatedAt = System.currentTimeMillis()
+                        updatedAt = System.currentTimeMillis(),
+                        conversationJson = if (paused) current?.conversationJson else null,
+                        timeline = current?.timeline.orEmpty()
                     )
-
-                    taskStore.save(completed)
-
+                    taskStore.save(finalTask)
                     AiAgentNotifications.showResult(
                         context,
-                        completed,
-                        "Dicio AI task complete",
+                        finalTask,
+                        if (paused) "Dicio AI task paused" else "Dicio AI task complete",
                         reply
                     )
                 }
-
-                addMessage(
-                    AiUiMessage(
-                        ++nextId,
-                        "assistant",
-                        reply
-                    )
-                )
+                addMessage(AiUiMessage(++nextId, "assistant", reply))
             } catch (t: Throwable) {
-                val status =
-                    if (cancelledTasks.contains(taskId)) {
-                        "CANCELLED"
-                    } else {
-                        "FAILED"
-                    }
-
-                val current = taskStore.list()
-                    .firstOrNull { it.id == taskId }
-
+                val status = if (cancelledTasks.contains(taskId)) "CANCELLED" else "FAILED"
+                val current = taskStore.find(taskId)
+                val failureText = if (status == "CANCELLED") "Task cancelled." else
+                    "I hit an error: ${t.message ?: "unknown error"}"
                 val failed = AiTaskCheckpoint(
                     id = taskId,
                     request = clean,
                     status = status,
                     step = current?.step ?: 0,
                     lastTool = current?.lastTool,
-                    updatedAt = System.currentTimeMillis()
+                    updatedAt = System.currentTimeMillis(),
+                    conversationJson = current?.conversationJson,
+                    timeline = current?.timeline.orEmpty()
                 )
-
                 taskStore.save(failed)
-
-                addMessage(
-                    AiUiMessage(
-                        ++nextId,
-                        "assistant",
-                        if (status == "CANCELLED") {
-                            "Task cancelled."
-                        } else {
-                            "I hit an error: ${t.message ?: "unknown error"}"
-                        }
-                    )
-                )
-
+                addMessage(AiUiMessage(++nextId, "assistant", failureText))
                 AiAgentNotifications.showResult(
                     context,
                     failed,
-                    if (status == "CANCELLED") {
-                        "Dicio AI task stopped"
-                    } else {
-                        "Dicio AI task failed"
-                    },
-                    if (status == "CANCELLED") {
-                        "The task was stopped."
-                    } else {
-                        "I hit an error: ${t.message ?: "unknown error"}"
-                    }
+                    if (status == "CANCELLED") "Dicio AI task stopped" else "Dicio AI task failed",
+                    if (status == "CANCELLED") "The task was stopped." else failureText
                 )
             } finally {
                 saveHistory()
@@ -297,9 +327,19 @@ class AiAgentEngine(private val context: Context) {
         val task = taskStore.find(id) ?: return false
         if (activeTaskId == id) return cancelCurrentTask()
         if (task.status !in setOf("RUNNING", "WAITING_CONFIRMATION")) return false
+
         cancelledTasks.add(id)
-        taskStore.save(task.copy(status = "CANCELLED", updatedAt = System.currentTimeMillis()))
-        if (task.status == "WAITING_CONFIRMATION") {
+        taskStore.save(
+            task.copy(
+                status = "CANCELLED",
+                updatedAt = System.currentTimeMillis(),
+                pendingCallId = null,
+                pendingTool = null,
+                pendingArguments = null,
+                pendingSummary = null
+            )
+        )
+        if (task.status == "WAITING_CONFIRMATION" || pendingContinuation?.taskId == id) {
             pendingContinuation = null
             _pendingConfirmation.value = null
         }
@@ -323,37 +363,184 @@ class AiAgentEngine(private val context: Context) {
     }
 
     fun cancelCurrentTask(): Boolean {
-        val id = activeTaskId ?: return false
-        cancelledTasks.add(id); taskStore.list().firstOrNull { it.id == id }?.let { taskStore.save(it.copy(status = "CANCELLED")) }
-        pendingContinuation = null; _pendingConfirmation.value = null
+        val id = activeTaskId
+            ?: pendingContinuation?.taskId
+            ?: taskStore.list().firstOrNull {
+                it.status == "RUNNING" || it.status == "WAITING_CONFIRMATION"
+            }?.id
+            ?: return false
+
+        cancelledTasks.add(id)
+        taskStore.find(id)?.let {
+            taskStore.save(
+                it.copy(
+                    status = "CANCELLED",
+                    updatedAt = System.currentTimeMillis(),
+                    pendingCallId = null,
+                    pendingTool = null,
+                    pendingArguments = null,
+                    pendingSummary = null
+                )
+            )
+        }
+        pendingContinuation = null
+        _pendingConfirmation.value = null
+        val wasRunning = currentJob != null
         currentJob?.cancel()
+        if (!wasRunning) AiAgentForegroundService.stop(context)
         return true
     }
 
     fun confirmPending(approved: Boolean) {
-        val pending = _pendingConfirmation.value ?: return
-        _pendingConfirmation.value = null
-        val continuation = pendingContinuation; pendingContinuation = null
-        if (!approved) {
-            continuation?.let { taskStore.save(AiTaskCheckpoint(it.taskId, it.userText, "CANCELLED", it.round, pending.tool)) }
-            publishSystem("Cancelled: ${pending.summary}"); return
+        if (_pendingConfirmation.value == null) {
+            taskStore.list().firstOrNull { it.status == "WAITING_CONFIRMATION" }?.let {
+                restorePendingConfirmation(it)
+            }
         }
-        scope.launch {
+        if (_pendingConfirmation.value == null) {
+            publishSystem("There is no saved action waiting for approval.")
+            return
+        }
+        val taskId = pendingContinuation?.taskId
+            ?: taskStore.list().firstOrNull { it.status == "WAITING_CONFIRMATION" }?.id
+        if (!AiAgentForegroundService.approvePending(context, approved, taskId)) {
+            publishSystem("Dicio AI could not resume its background service. Open the app and try again.")
+        }
+    }
+
+    private fun confirmPendingInternal(approved: Boolean, requestedTaskId: String?) {
+        if (_busy.value) {
+            publishSystem("Dicio AI is already running a task.")
+            return
+        }
+        if (!requestedTaskId.isNullOrBlank() && pendingContinuation?.taskId != requestedTaskId) {
+            pendingContinuation = null
+            _pendingConfirmation.value = null
+        }
+        if (_pendingConfirmation.value == null) {
+            val waiting = if (!requestedTaskId.isNullOrBlank()) {
+                taskStore.find(requestedTaskId)?.takeIf { it.status == "WAITING_CONFIRMATION" }
+            } else {
+                taskStore.list().firstOrNull { it.status == "WAITING_CONFIRMATION" }
+            }
+            if (waiting != null) restorePendingConfirmation(waiting)
+        }
+
+        val pending = _pendingConfirmation.value
+        if (pending == null) {
+            publishSystem("This approval is no longer active. Re-open the task to review it again.")
+            AiAgentForegroundService.stop(context)
+            return
+        }
+        val continuation = pendingContinuation
+        val taskId = continuation?.taskId
+            ?: requestedTaskId
+            ?: taskStore.list().firstOrNull { it.status == "WAITING_CONFIRMATION" }?.id
+        _pendingConfirmation.value = null
+        pendingContinuation = null
+
+        if (!approved) {
+            if (taskId != null) taskStore.find(taskId)?.let {
+                taskStore.save(
+                    it.copy(
+                        status = "CANCELLED",
+                        updatedAt = System.currentTimeMillis(),
+                        pendingCallId = null,
+                        pendingTool = null,
+                        pendingArguments = null,
+                        pendingSummary = null
+                    )
+                )
+            }
+            publishSystem("Cancelled: ${pending.summary}")
+            AiAgentForegroundService.stop(context)
+            return
+        }
+        if (continuation == null) {
+            publishSystem("I could not safely resume this action. Resume the task to review it again.")
+            AiAgentForegroundService.stop(context)
+            return
+        }
+
+        activeTaskId = continuation.taskId
+        cancelledTasks.remove(continuation.taskId)
+        currentJob = scope.launch {
             _busy.value = true
             event(pending.tool, "approved", pending.summary)
             try {
                 val result = executeTool(pending.tool, pending.arguments)
                 event(pending.tool, "completed", result.take(300))
-                if (continuation != null) {
-                    taskStore.save(AiTaskCheckpoint(continuation.taskId, continuation.userText, "RUNNING", continuation.round, pending.tool))
-                    val resumed = continuation.conversation.toMutableList().apply { add(AiChatMessage("tool", result, toolCallId = continuation.callId)) }
-                    val reply = continueAgent(resumed, continuation.taskId, continuation.userText, continuation.round + 1)
-                    addMessage(AiUiMessage(++nextId, "assistant", reply))
-                    if (_pendingConfirmation.value == null) taskStore.save(AiTaskCheckpoint(continuation.taskId, continuation.userText, "COMPLETED", continuation.round + 1, pending.tool))
-                } else addMessage(AiUiMessage(++nextId, "assistant", result))
+                val resumed = continuation.conversation.toMutableList().apply {
+                    add(AiChatMessage("tool", result, toolCallId = continuation.callId))
+                }
+                saveAgentCheckpoint(
+                    continuation.taskId,
+                    continuation.userText,
+                    "RUNNING",
+                    continuation.round + 1,
+                    pending.tool,
+                    resumed
+                )
+                val reply = continueAgent(resumed, continuation.taskId, continuation.userText, continuation.round + 1)
+                addMessage(AiUiMessage(++nextId, "assistant", reply))
+
+                if (_pendingConfirmation.value == null && !cancelledTasks.contains(continuation.taskId)) {
+                    val current = taskStore.find(continuation.taskId)
+                    val paused = reply.startsWith("I reached the ${MAX_AGENT_ROUNDS}-step agent limit")
+                    val updated = (current ?: AiTaskCheckpoint(
+                        id = continuation.taskId,
+                        request = continuation.userText,
+                        status = "RUNNING"
+                    )).copy(
+                        status = if (paused) "PAUSED" else "COMPLETED",
+                        step = if (paused) MAX_AGENT_ROUNDS else (current?.step ?: continuation.round + 1),
+                        updatedAt = System.currentTimeMillis(),
+                        conversationJson = if (paused) current?.conversationJson else null,
+                        pendingCallId = null,
+                        pendingTool = null,
+                        pendingArguments = null,
+                        pendingSummary = null
+                    )
+                    taskStore.save(updated)
+                    AiAgentNotifications.showResult(
+                        context,
+                        updated,
+                        if (paused) "Dicio AI task paused" else "Dicio AI task complete",
+                        reply
+                    )
+                }
+            } catch (t: Throwable) {
+                val status = if (cancelledTasks.contains(continuation.taskId)) "CANCELLED" else "FAILED"
+                val current = taskStore.find(continuation.taskId)
+                val failureText = if (status == "CANCELLED") "Task cancelled." else
+                    "The approved action or follow-up failed: ${t.message ?: "unknown error"}"
+                val failed = (current ?: AiTaskCheckpoint(
+                    id = continuation.taskId,
+                    request = continuation.userText,
+                    status = status
+                )).copy(
+                    status = status,
+                    updatedAt = System.currentTimeMillis(),
+                    pendingCallId = null,
+                    pendingTool = null,
+                    pendingArguments = null,
+                    pendingSummary = null
+                )
+                taskStore.save(failed)
+                addMessage(AiUiMessage(++nextId, "assistant", failureText))
+                AiAgentNotifications.showResult(
+                    context,
+                    failed,
+                    if (status == "CANCELLED") "Dicio AI task stopped" else "Dicio AI task failed",
+                    failureText
+                )
+            } finally {
                 saveHistory()
-            } catch (t: Throwable) { addMessage(AiUiMessage(++nextId, "assistant", "The approved action failed: ${t.message ?: "unknown error"}")) }
-            finally { _busy.value = false }
+                _busy.value = false
+                activeTaskId = null
+                currentJob = null
+                AiAgentForegroundService.stop(context)
+            }
         }
     }
 
@@ -373,13 +560,25 @@ class AiAgentEngine(private val context: Context) {
                 )
             }
     }
-    fun saveConfig(endpoint: String, model: String, apiKey: String, systemPrompt: String) {
-        prefs.edit().putString("endpoint", if (endpoint.isBlank()) DEFAULT_ENDPOINT else endpoint).putString("model", if (model.isBlank()) DEFAULT_MODEL else model).putString("system_prompt", if (systemPrompt.isBlank()) DEFAULT_SYSTEM_PROMPT else systemPrompt).putLong("config_revision", System.currentTimeMillis()).apply()
+    fun saveConfig(
+        endpoint: String,
+        model: String,
+        apiKey: String,
+        systemPrompt: String,
+        visionModel: String = visionModelName
+    ) {
+        prefs.edit()
+            .putString("endpoint", if (endpoint.isBlank()) DEFAULT_ENDPOINT else endpoint)
+            .putString("model", if (model.isBlank()) DEFAULT_MODEL else model)
+            .putString("vision_model", if (visionModel.isBlank()) DEFAULT_VISION_MODEL else visionModel)
+            .putString("system_prompt", if (systemPrompt.isBlank()) DEFAULT_SYSTEM_PROMPT else systemPrompt)
+            .putLong("config_revision", System.currentTimeMillis())
+            .apply()
         SecureSecretStore.put(context, apiKey)
     }
 
     private suspend fun runAgent(userText: String, taskId: String): String {
-        if (apiKey.isBlank() && endpoint.contains("openrouter.ai", ignoreCase = true)) return "Add your OpenRouter API key in AI settings, or switch to a local OpenAI-compatible server such as Ollama."
+        if (apiKey.isBlank() && endpoint.contains("openrouter.ai", ignoreCase = true)) error("Add your OpenRouter API key in AI settings, or switch to a local OpenAI-compatible server such as Ollama.")
         val conversation = mutableListOf<AiChatMessage>()
         val memoryContext = memory.list().take(12).joinToString("\n") { "- [${it.id}] ${it.text}" }
         val system = buildString {
@@ -394,33 +593,87 @@ class AiAgentEngine(private val context: Context) {
         return continueAgent(conversation, taskId, userText, 0)
     }
 
-    private suspend fun continueAgent(conversation: MutableList<AiChatMessage>, taskId: String, userText: String, startRound: Int): String {
-        val tools = toolDefinitions(); var round = startRound
+    private suspend fun continueAgent(
+        conversation: MutableList<AiChatMessage>,
+        taskId: String,
+        userText: String,
+        startRound: Int
+    ): String {
+        val tools = toolDefinitions()
+        var round = startRound
         while (round < MAX_AGENT_ROUNDS) {
             if (cancelledTasks.contains(taskId)) return "Task cancelled."
             event("agent", "thinking", "Planning step ${round + 1}")
-            val response = client.chat(endpoint = endpoint, apiKey = apiKey, request = AiChatRequest(model = model, messages = conversation.toList(), tools = tools, toolChoice = "auto"))
-            val message = response.choices.firstOrNull()?.message ?: error("AI provider returned no message")
-            val calls = message.toolCalls.orEmpty()
-            if (calls.isEmpty()) return message.content?.trim().orEmpty().ifBlank { "Done." }
-            conversation += AiChatMessage("assistant", message.content, toolCalls = calls)
-            for (call in calls) {
-                if (cancelledTasks.contains(taskId)) return "Task cancelled."
-                event(call.function.name, "requested", call.function.arguments.take(200))
-                if (requiresConfirmation(call.function.name)) {
-                    taskStore.save(AiTaskCheckpoint(taskId, userText, "WAITING_CONFIRMATION", round + 1, call.function.name))
-                    pendingContinuation = PendingContinuation(taskId, userText, conversation.toList(), call.id, round + 1)
-                    _pendingConfirmation.value = PendingConfirmation(call.function.name, call.function.arguments, confirmationSummary(call.function.name, call.function.arguments))
-                    return "This action needs your confirmation before I continue the task."
-                }
-                val result = executeTool(call.function.name, call.function.arguments)
-                taskStore.save(AiTaskCheckpoint(taskId, userText, "RUNNING", round + 1, call.function.name))
-                event(call.function.name, "completed", result.take(200))
-                conversation += AiChatMessage("tool", result, toolCallId = call.id)
+            val response = client.chat(
+                endpoint = endpoint,
+                apiKey = apiKey,
+                request = AiChatRequest(
+                    model = model,
+                    messages = conversation.toList(),
+                    tools = tools,
+                    toolChoice = "auto"
+                )
+            )
+            val message = response.choices.firstOrNull()?.message
+                ?: error("AI provider returned no message")
+            val call = message.toolCalls.orEmpty().firstOrNull()
+            if (call == null) return message.content?.trim().orEmpty().ifBlank { "Done." }
+
+            // Process one call per model round; every call always receives a matching result.
+            conversation += AiChatMessage("assistant", message.content, toolCalls = listOf(call))
+            if (cancelledTasks.contains(taskId)) return "Task cancelled."
+
+            val toolName = call.function.name
+            val arguments = call.function.arguments
+            event(toolName, "requested", arguments.take(200))
+            if (requiresConfirmation(toolName)) {
+                val summary = confirmationSummary(toolName, arguments)
+                pendingContinuation = PendingContinuation(taskId, userText, conversation.toList(), call.id, round)
+                _pendingConfirmation.value = PendingConfirmation(toolName, arguments, summary)
+                val checkpoint = saveAgentCheckpoint(
+                    taskId, userText, "WAITING_CONFIRMATION", round + 1,
+                    toolName, conversation, call, summary
+                )
+                AiAgentNotifications.showConfirmation(context, checkpoint, summary)
+                return "This action needs your confirmation before I continue the task."
             }
+
+            val result = executeTool(toolName, arguments)
+            conversation += AiChatMessage("tool", result, toolCallId = call.id)
+            saveAgentCheckpoint(taskId, userText, "RUNNING", round + 1, toolName, conversation)
+            event(toolName, "completed", result.take(200))
             round++
         }
         return "I reached the ${MAX_AGENT_ROUNDS}-step agent limit before finishing. Ask me to continue."
+    }
+
+    private fun saveAgentCheckpoint(
+        taskId: String,
+        userText: String,
+        status: String,
+        step: Int,
+        lastTool: String?,
+        conversation: List<AiChatMessage>,
+        pendingCall: AiToolCall? = null,
+        pendingSummary: String? = null
+    ): AiTaskCheckpoint {
+        val previous = taskStore.find(taskId)
+        val checkpoint = AiTaskCheckpoint(
+            id = taskId,
+            request = userText,
+            status = status,
+            step = step,
+            lastTool = lastTool,
+            updatedAt = System.currentTimeMillis(),
+            conversationJson = json.encodeToString(conversation),
+            pendingCallId = pendingCall?.id,
+            pendingTool = pendingCall?.function?.name,
+            pendingArguments = pendingCall?.function?.arguments,
+            pendingSummary = pendingSummary,
+            timeline = previous?.timeline.orEmpty()
+        )
+        taskStore.save(checkpoint)
+        return taskStore.find(taskId) ?: checkpoint
     }
 
     private fun confirmationSummary(tool: String, arguments: String): String = when (tool) {
@@ -706,7 +959,7 @@ class AiAgentEngine(private val context: Context) {
         return client.vision(endpoint, apiKey, visionModel(), prompt, screenshot)
     }
 
-    private fun visionModel(): String = prefs.getString("vision_model", DEFAULT_VISION_MODEL) ?: DEFAULT_VISION_MODEL
+    private fun visionModel(): String = visionModelName
 
     private fun searchWeb(query: String): String {
         if (query.isBlank()) return "Search query was empty."
@@ -794,7 +1047,7 @@ class AiAgentEngine(private val context: Context) {
         const val DEFAULT_MODEL = "openrouter/free"
         const val DEFAULT_VISION_MODEL = "openrouter/free"
         val DEFAULT_SYSTEM_PROMPT = """
-You are Dicio AI 0.7, an Android AI agent and controlled phone operator.
+You are Dicio AI 0.9.1, an Android AI agent and controlled phone operator.
 Be concise, practical, and action-oriented.
 Prefer using available tools over explaining how the user could do something manually.
 For multi-step requests, execute the smallest useful sequence of tools and use each result to decide what comes next.

@@ -50,7 +50,8 @@ class AiAgentForegroundService : Service() {
 
             ACTION_APPROVE -> {
                 engine.confirmPendingFromService(
-                    intent.getBooleanExtra(EXTRA_APPROVED, false)
+                    intent.getBooleanExtra(EXTRA_APPROVED, false),
+                    intent.getStringExtra(EXTRA_TASK_ID)
                 )
             }
 
@@ -92,8 +93,8 @@ class AiAgentForegroundService : Service() {
 
         fun isRunning(): Boolean = instance != null
 
-        fun startTask(context: Context, request: String) {
-            start(
+        fun startTask(context: Context, request: String): Boolean {
+            return start(
                 context,
                 Intent(context, AiAgentForegroundService::class.java)
                     .setAction(ACTION_START)
@@ -101,8 +102,8 @@ class AiAgentForegroundService : Service() {
             )
         }
 
-        fun startExistingTask(context: Context, taskId: String) {
-            start(
+        fun startExistingTask(context: Context, taskId: String): Boolean {
+            return start(
                 context,
                 Intent(context, AiAgentForegroundService::class.java)
                     .setAction(ACTION_RESUME)
@@ -110,12 +111,13 @@ class AiAgentForegroundService : Service() {
             )
         }
 
-        fun approvePending(context: Context, approved: Boolean) {
-            start(
+        fun approvePending(context: Context, approved: Boolean, taskId: String? = null): Boolean {
+            return start(
                 context,
                 Intent(context, AiAgentForegroundService::class.java)
                     .setAction(ACTION_APPROVE)
                     .putExtra(EXTRA_APPROVED, approved)
+                    .putExtra(EXTRA_TASK_ID, taskId)
             )
         }
 
@@ -132,17 +134,20 @@ class AiAgentForegroundService : Service() {
             )
         }
 
-        private fun start(context: Context, intent: Intent) {
-            try {
+        private fun start(context: Context, intent: Intent): Boolean {
+            return try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     context.startForegroundService(intent)
                 } else {
                     context.startService(intent)
                 }
+                true
             } catch (_: SecurityException) {
                 // The task remains persisted and can be resumed when the app is opened.
+                false
             } catch (_: IllegalStateException) {
                 // Background-start restrictions can reject a request; persisted state is safe.
+                false
             }
         }
     }

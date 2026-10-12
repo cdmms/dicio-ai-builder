@@ -80,9 +80,7 @@ fun AiAgentScreen(
     val pending by engine.pendingConfirmation
     val listState = rememberLazyListState()
 
-    val providerReady = engine.apiKey.isNotBlank() ||
-        engine.endpoint.contains("127.0.0.1", ignoreCase = true) ||
-        engine.endpoint.contains("localhost", ignoreCase = true)
+    val providerReady = engine.isConfigured
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -801,6 +799,9 @@ private fun AiSettingsDialog(
     var systemPrompt by remember(engine.configRevision) {
         mutableStateOf(engine.systemPrompt)
     }
+    var visionModel by remember(engine.configRevision) {
+        mutableStateOf(engine.visionModelName)
+    }
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
 
     AlertDialog(
@@ -853,6 +854,12 @@ private fun AiSettingsDialog(
 
                 if (showAdvanced) {
                     OutlinedTextField(
+                        value = visionModel,
+                        onValueChange = { visionModel = it },
+                        label = { Text("Vision model") },
+                        singleLine = true
+                    )
+                    OutlinedTextField(
                         value = systemPrompt,
                         onValueChange = { systemPrompt = it },
                         label = { Text("Agent instructions") },
@@ -876,7 +883,8 @@ private fun AiSettingsDialog(
                         endpoint.trim(),
                         model.trim(),
                         apiKey.trim(),
-                        systemPrompt.trim()
+                        systemPrompt.trim(),
+                        visionModel.trim()
                     )
                     onDismiss()
                 }

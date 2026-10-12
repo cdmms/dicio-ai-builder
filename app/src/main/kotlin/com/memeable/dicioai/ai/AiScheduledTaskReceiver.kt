@@ -26,21 +26,29 @@ class AiScheduledTaskReceiver : BroadcastReceiver() {
         } else {
             store.remove(id)
         }
-        showNotification(context, task)
+        val started = AiAgentForegroundService.startTask(context, task.request)
+        showNotification(context, task, started)
     }
 
-    private fun showNotification(context: Context, task: AiScheduledTask) {
+    private fun showNotification(context: Context, task: AiScheduledTask, started: Boolean) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Dicio AI scheduled agents", NotificationManager.IMPORTANCE_HIGH))
         }
         val runIntent = Intent(context, AiAgentActivity::class.java)
-            .putExtra(AiAgentActivity.EXTRA_RUN_TASK, task.request)
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        if (!started) {
+            runIntent.putExtra(AiAgentActivity.EXTRA_RUN_TASK, task.request)
+        }
         val pending = PendingIntent.getActivity(context, task.id.hashCode(), runIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) Notification.Builder(context, CHANNEL_ID) else Notification.Builder(context)
-        manager.notify(task.id.hashCode(), builder.setSmallIcon(android.R.drawable.ic_dialog_info).setContentTitle("Dicio AI scheduled task").setContentText(task.request.take(140)).setContentIntent(pending).setAutoCancel(true).build())
+        manager.notify(task.id.hashCode(), builder.setSmallIcon(android.R.drawable.ic_dialog_info)
+                .setContentTitle(if (started) "Dicio AI scheduled task queued" else "Tap to run scheduled task")
+                .setContentText((if (started) "Queued: " else "Ready: ") + task.request.take(120))
+                .setContentIntent(pending)
+                .setAutoCancel(true)
+                .build())
     }
 
     companion object {

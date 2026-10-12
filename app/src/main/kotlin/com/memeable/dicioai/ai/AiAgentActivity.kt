@@ -46,6 +46,7 @@ class AiAgentActivity : ComponentActivity() {
         voiceController.onSpeechFinished = { continueHandsFreeIfNeeded() }
 
         val scheduledRequest = intent?.getStringExtra(EXTRA_RUN_TASK)
+        intent?.removeExtra(EXTRA_RUN_TASK)
 
         setContent {
             AiAgentTheme {

@@ -15,6 +15,10 @@ class AiScheduleBootReceiver : BroadcastReceiver() {
                 val next = task.copy(whenMs = now + task.repeatMs)
                 store.save(next)
                 AiScheduledTaskReceiver.schedule(context, next)
+            } else {
+                val overdue = task.copy(whenMs = now + 1_000L)
+                store.save(overdue)
+                AiScheduledTaskReceiver.schedule(context, overdue)
             }
         }
     }

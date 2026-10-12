@@ -145,6 +145,7 @@ object AiAgentNotifications {
         val approveIntent = Intent(context, AiAgentForegroundService::class.java)
             .setAction(AiAgentForegroundService.ACTION_APPROVE)
             .putExtra(AiAgentForegroundService.EXTRA_APPROVED, true)
+            .putExtra(AiAgentForegroundService.EXTRA_TASK_ID, task.id)
         val approvePending = PendingIntent.getService(
             context,
             id xor 0x11,
@@ -155,6 +156,7 @@ object AiAgentNotifications {
         val cancelIntent = Intent(context, AiAgentForegroundService::class.java)
             .setAction(AiAgentForegroundService.ACTION_APPROVE)
             .putExtra(AiAgentForegroundService.EXTRA_APPROVED, false)
+            .putExtra(AiAgentForegroundService.EXTRA_TASK_ID, task.id)
         val cancelPending = PendingIntent.getService(
             context,
             id xor 0x12,

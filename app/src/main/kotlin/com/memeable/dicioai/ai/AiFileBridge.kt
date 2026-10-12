@@ -80,8 +80,13 @@ object AiFileBridge {
         dst.parentFile?.mkdirs()
         return runCatching {
             src.copyTo(dst, overwrite = true)
-            if (move) src.delete()
-            if (move) "Moved ${relative(context, src)} to ${relative(context, dst)}." else "Copied ${relative(context, src)} to ${relative(context, dst)}."
+            if (move && !src.delete()) {
+                "Copied to ${relative(context, dst)}, but could not remove the original ${relative(context, src)}."
+            } else if (move) {
+                "Moved ${relative(context, src)} to ${relative(context, dst)}."
+            } else {
+                "Copied ${relative(context, src)} to ${relative(context, dst)}."
+            }
         }.getOrElse { "File operation failed: ${it.message ?: "unknown error"}" }
     }
 

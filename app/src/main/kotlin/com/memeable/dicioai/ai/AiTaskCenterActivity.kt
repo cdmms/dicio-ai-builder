@@ -109,6 +109,7 @@ private fun AiTaskCenterScreen(
             TaskDetailView(
                 task = selected,
                 engine = engine,
+                contentPadding = padding,
                 onBack = { selectedId = null }
             )
         } else {
@@ -152,7 +153,7 @@ private fun AiTaskCenterScreen(
                             emphasized = false,
                             onOpen = { selectedId = task.id },
                             onResume = if (
-                                task.status in setOf("RUNNING", "WAITING_CONFIRMATION")
+                                task.status in setOf("RUNNING", "WAITING_CONFIRMATION", "PAUSED")
                             ) {
                                 { engine.resumeTaskFromCenter(task.id) }
                             } else {
@@ -160,13 +161,17 @@ private fun AiTaskCenterScreen(
                             },
                             onStop = null,
                             onRetry = if (
-                                task.status !in setOf("RUNNING", "WAITING_CONFIRMATION")
+                                task.status !in setOf("RUNNING", "WAITING_CONFIRMATION", "PAUSED")
                             ) {
                                 { engine.retryTaskFromCenter(task.id) }
                             } else {
                                 null
                             },
-                            onDelete = null
+                            onDelete = if (task.status !in setOf("RUNNING", "WAITING_CONFIRMATION")) {
+                                { engine.deleteTaskFromCenter(task.id) }
+                            } else {
+                                null
+                            }
                         )
                     }
                 }
@@ -281,99 +286,48 @@ private fun TaskCard(
 private fun TaskDetailView(
     task: AiTaskCheckpoint,
     engine: AiAgentEngine,
+    contentPadding: PaddingValues,
     onBack: () -> Unit
 ) {
     val events = task.timeline.asReversed()
-
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxSize().padding(contentPadding),
         verticalArrangement = Arrangement.spacedBy(10.dp),
         contentPadding = PaddingValues(18.dp)
     ) {
+        item { TextButton(onClick = onBack) { Text("← Task list") } }
         item {
-            TextButton(onClick = onBack) {
-                Text("← Task list")
-            }
-        }
-
-        item {
-            Surface(
-                tonalElevation = 3.dp,
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.large
-            ) {
+            Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.large) {
                 Column(modifier = Modifier.padding(18.dp)) {
-                    Text(
-                        statusTitle(task.status),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        task.request,
-                        style = MaterialTheme.typography.bodyLarge,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                    Text(
-                        "Step ${task.step.coerceAtLeast(1)} of ${AiAgentEngine.MAX_AGENT_ROUNDS}",
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(top = 10.dp)
-                    )
+                    Text(statusTitle(task.status), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text(task.request, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(top = 8.dp))
+                    Text("Step ${task.step.coerceAtLeast(1)} of ${AiAgentEngine.MAX_AGENT_ROUNDS}", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 10.dp))
                     task.lastTool?.let {
-                        Text(
-                            "Last action: $it",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 5.dp)
-                        )
+                        Text("Last action: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 5.dp))
                     }
-                    Text(
-                        "Updated ${formatTime(task.updatedAt)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
+                    Text("Updated ${formatTime(task.updatedAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                 }
             }
         }
-
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (task.status in setOf("RUNNING", "WAITING_CONFIRMATION")) {
-                    FilledTonalButton(
-                        onClick = { engine.stopTaskFromCenter(task.id) }
-                    ) {
-                        Text("Stop")
-                    }
-                    TextButton(
-                        onClick = { engine.resumeTaskFromCenter(task.id) }
-                    ) {
-                        Text("Resume")
-                    }
+                    FilledTonalButton(onClick = { engine.stopTaskFromCenter(task.id) }) { Text("Stop") }
+                    TextButton(onClick = { engine.resumeTaskFromCenter(task.id) }) { Text("Resume") }
+                } else if (task.status == "PAUSED") {
+                    Button(onClick = { engine.resumeTaskFromCenter(task.id) }) { Text("Resume") }
+                    TextButton(onClick = { engine.deleteTaskFromCenter(task.id) }) { Text("Delete") }
                 } else {
-                    Button(
-                        onClick = { engine.retryTaskFromCenter(task.id) }
-                    ) {
-                        Text("Retry")
-                    }
+                    Button(onClick = { engine.retryTaskFromCenter(task.id) }) { Text("Retry") }
+                    TextButton(onClick = { engine.deleteTaskFromCenter(task.id) }) { Text("Delete") }
                 }
             }
         }
-
-        item {
-            SectionLabel("Execution timeline")
-        }
-
+        item { SectionLabel("Execution timeline") }
         if (events.isEmpty()) {
-            item {
-                Text(
-                    "No recorded agent steps yet.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            }
+            item { Text("No recorded agent steps yet.", style = MaterialTheme.typography.bodyMedium) }
         } else {
-            items(events, key = { it.id }) { event ->
-                TimelineRow(event)
-            }
+            items(events, key = { it.id }) { event -> TimelineRow(event) }
         }
     }
 }
@@ -425,6 +379,7 @@ private fun TimelineRow(event: AiTaskTimelineEntry) {
 
 private fun statusTitle(status: String): String = when (status) {
     "RUNNING" -> "Running"
+    "PAUSED" -> "Paused"
     "WAITING_CONFIRMATION" -> "Needs approval"
     "COMPLETED" -> "Completed"
     "FAILED" -> "Failed"

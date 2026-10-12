@@ -205,7 +205,6 @@ class AgentAccessibilityService : AccessibilityService() {
             val root = service.rootInActiveWindow ?: return "No active window is available."
             var target = if (label.isBlank()) root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
             else service.findEditableNode(root, label.lowercase())
-            if (target == null && label.isNotBlank()) target = service.findFirstEditable(root)
             target ?: return "No visible editable element matched '$label'."
             if (!target.isEditable) return "The matched element '$label' is not editable."
             target.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
