@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
@@ -71,6 +74,9 @@ fun AiAgentScreen(
 ) {
     var input by rememberSaveable { mutableStateOf("") }
     var showSettings by remember { mutableStateOf(false) }
+    var showMemories by remember { mutableStateOf(false) }
+    var savedMemories by remember { mutableStateOf(engine.memorySnapshot()) }
+    var accessibilityConnected by remember { mutableStateOf(AgentAccessibilityService.isConnected()) }
     var showClear by remember { mutableStateOf(false) }
     var showVoiceMenu by remember { mutableStateOf(false) }
     var persistedTasks by remember { mutableStateOf(engine.taskSnapshot()) }
@@ -85,6 +91,7 @@ fun AiAgentScreen(
     LaunchedEffect(Unit) {
         while (true) {
             persistedTasks = engine.taskSnapshot()
+            accessibilityConnected = AgentAccessibilityService.isConnected()
             delay(1000L)
         }
     }
@@ -288,7 +295,78 @@ fun AiAgentScreen(
     if (showSettings) {
         AiSettingsDialog(
             engine = engine,
-            onDismiss = { showSettings = false }
+            accessibilityConnected = accessibilityConnected,
+            onRefreshAccessibility = { accessibilityConnected = AgentAccessibilityService.isConnected() },
+            onDismiss = { showSettings = false },
+            onManageMemories = {
+                savedMemories = engine.memorySnapshot()
+                showSettings = false
+                showMemories = true
+            }
+        )
+    }
+
+    if (showMemories) {
+        AlertDialog(
+            onDismissRequest = { showMemories = false },
+            title = { Text("Saved memories") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Review what Dicio has saved. Forgetting a memory removes it from this device.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    if (savedMemories.isEmpty()) {
+                        Text("No saved memories yet.")
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.heightIn(max = 360.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(items = savedMemories, key = { it.id }) { memory ->
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = MaterialTheme.shapes.medium,
+                                    tonalElevation = 1.dp
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                "Memory #${memory.id}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                memory.text,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.padding(top = 3.dp)
+                                            )
+                                        }
+                                        TextButton(
+                                            onClick = {
+                                                engine.forgetMemory(memory.id)
+                                                savedMemories = engine.memorySnapshot()
+                                            }
+                                        ) {
+                                            Text("Forget")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMemories = false }) {
+                    Text("Done")
+                }
+            }
         )
     }
 
@@ -785,7 +863,10 @@ private fun MessageBubble(message: AiUiMessage) {
 @Composable
 private fun AiSettingsDialog(
     engine: AiAgentEngine,
-    onDismiss: () -> Unit
+    accessibilityConnected: Boolean,
+    onRefreshAccessibility: () -> Unit,
+    onDismiss: () -> Unit,
+    onManageMemories: () -> Unit
 ) {
     var endpoint by remember(engine.configRevision) {
         mutableStateOf(engine.endpoint)
@@ -811,6 +892,7 @@ private fun AiSettingsDialog(
         },
         text = {
             Column(
+                modifier = Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
@@ -867,12 +949,45 @@ private fun AiSettingsDialog(
                     )
                 }
 
-                TextButton(
-                    onClick = {
-                        engine.openAccessibilitySettings()
-                    }
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.medium,
+                    tonalElevation = 1.dp,
+                    color = if (accessibilityConnected) MaterialTheme.colorScheme.secondaryContainer
+                    else MaterialTheme.colorScheme.surfaceContainerHigh
                 ) {
-                    Text("Enable phone control")
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(5.dp)
+                    ) {
+                        Text(
+                            if (accessibilityConnected) "Background screen control is connected"
+                            else "Background screen control needs permission",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            if (accessibilityConnected)
+                                "Dicio can inspect and interact with the app currently on screen while Dicio AI is in the background. Android or some apps may restrict individual screens or actions."
+                            else
+                                "Open Android Accessibility settings, select Dicio AI, and enable its service. Keep it enabled when you leave Dicio so screen reading and actions can work in other apps.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            TextButton(onClick = {
+                                engine.openAccessibilitySettings()
+                            }) {
+                                Text("Open Accessibility settings")
+                            }
+                            TextButton(onClick = onRefreshAccessibility) {
+                                Text("Check again")
+                            }
+                        }
+                    }
+                }
+
+                TextButton(onClick = onManageMemories) {
+                    Text("Manage saved memories")
                 }
             }
         },

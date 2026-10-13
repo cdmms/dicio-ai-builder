@@ -1,0 +1,7 @@
+Dicio AI 0.9.2
+
+- Add an on-device saved memories manager in AI settings.
+- Keep screen reading and control available in other foreground apps while Dicio AI is in the background, when Accessibility access is enabled.
+- Declare screenshot and interactive-window accessibility capabilities.
+- Improve Accessibility service lifecycle handling and show background-control readiness in settings.
+- Keep existing memories and task checkpoints intact during upgrade.

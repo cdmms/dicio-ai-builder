@@ -3,9 +3,10 @@
     android:description="@string/dicio_ai_accessibility_service_description"
     android:accessibilityEventTypes="typeAllMask"
     android:accessibilityFeedbackType="feedbackGeneric"
-    android:accessibilityFlags="flagIncludeNotImportantViews"
+    android:accessibilityFlags="flagIncludeNotImportantViews|flagRetrieveInteractiveWindows"
     android:notificationTimeout="100"
     android:canRetrieveWindowContent="true"
     android:canPerformGestures="true"
+    android:canTakeScreenshot="true"
     android:canRequestFilterKeyEvents="true"
     android:settingsActivity="com.memeable.dicioai.ai.AiAgentActivity" />

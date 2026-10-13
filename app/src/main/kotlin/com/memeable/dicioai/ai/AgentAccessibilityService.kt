@@ -29,7 +29,16 @@ class AgentAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {
-        if (instance === this) instance = null
+        // Android may interrupt service feedback without disconnecting the service.
+        // Keep the live service reference so tasks can continue in other apps.
+    }
+
+    override fun onDestroy() {
+        if (instance === this) {
+            instance = null
+            lastKnownScreenSignature = null
+        }
+        super.onDestroy()
     }
 
     private fun collect(node: AccessibilityNodeInfo?, out: StringBuilder, depth: Int) {
@@ -55,10 +64,12 @@ class AgentAccessibilityService : AccessibilityService() {
         @Volatile private var instance: AgentAccessibilityService? = null
         @Volatile private var lastKnownScreenSignature: String? = null
 
-        fun status(): String = if (instance != null)
-            "UI control is enabled and connected."
+        fun isConnected(): Boolean = instance != null
+
+        fun status(): String = if (isConnected())
+            "Accessibility screen control is connected. Dicio can inspect and interact with the active app while Dicio AI is in the background, where Android and the target app permit it."
         else
-            "UI control is not enabled. Ask the user to enable Dicio AI in Android Accessibility settings."
+            "Accessibility screen control is not connected. Enable Dicio AI in Android Settings > Accessibility, then return to Dicio AI and check again."
 
         fun currentPackageName(): String =
             instance?.rootInActiveWindow?.packageName?.toString().orEmpty()
@@ -69,7 +80,7 @@ class AgentAccessibilityService : AccessibilityService() {
         fun readVisibleUi(): String {
             val service = instance ?: return "Accessibility service is not enabled."
             val root = service.rootInActiveWindow ?: return "No active window is available."
-            val out = StringBuilder("ACTIVE SCREEN\n")
+            val out = StringBuilder("ACTIVE SCREEN\napp_package=${root.packageName?.toString().orEmpty()}\nwindow=${root.className?.toString().orEmpty()}\n")
             service.collect(root, out, 0)
             val result = out.toString().take(MAX_CHARS)
             lastKnownScreenSignature = service.currentSignatureInternal()

@@ -278,5 +278,5 @@
     <string name="about_privacy_title">Privacy policy</string>
     <string name="about_privacy_description">Dicio connects to external services only when a skill is expected to do so, or to download machine learning models during setup. All speech processing is performed locally on-device, and most skills can be used offline.</string>
     <string name="about_privacy_link" translatable="false">https://stypox.org/dicio-privacy-policy.html</string>
-    <string name="dicio_ai_accessibility_service_description">Dicio AI can see and interact with the screen when you enable its accessibility service.</string>
+    <string name="dicio_ai_accessibility_service_description">Dicio AI uses Accessibility access to read the active app screen and perform requested taps, typing, scrolling, and gestures while Dicio AI is in the background. Screen content may be sent to your configured AI provider to complete your request. Android or individual apps may restrict access.</string>
 </resources>
